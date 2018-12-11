@@ -4,5 +4,6 @@ variables:
 deploy-job:
     stage: deploy
     script:
-        - cd modules/ommr4all-client && npm install
-        - cd modules/ommr4all-client && ng build
+        - cd modules/ommr4all-client
+        - npm install
+        - ng build
