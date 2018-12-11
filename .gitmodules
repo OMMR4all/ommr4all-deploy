@@ -6,7 +6,7 @@
 	url = git@gitlab2.informatik.uni-wuerzburg.de:OMMR4all/ommr4all-client.git
 [submodule "modules/ommr4all-line-detection"]
 	path = modules/ommr4all-line-detection
-	url = git@gitlab2.informatik.uni-wuerzburg.de:OMMR4all/ommr4all-line-detection
+	url = git@gitlab2.informatik.uni-wuerzburg.de:OMMR4all/ommr4all-line-detection.git
 [submodule "modules/page-segmentation"]
 	path = modules/page-segmentation
 	url = git@gitlab2.informatik.uni-wuerzburg.de:chw71yx/page-segmentation.git
