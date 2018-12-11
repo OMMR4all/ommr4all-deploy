@@ -7,3 +7,4 @@ deploy-job:
         - cd modules/ommr4all-client
         - npm install
         - ng build
+
