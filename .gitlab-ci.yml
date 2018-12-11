@@ -18,7 +18,7 @@ deploy-job:
         - pip install -r modules/ommr4all-server/requirements.txt
         - cd modules/page-segmentation && python setup.py install && cd ../..
         - cd modules/ommr4all-line-detection && python setup.py install && cd ../..
-        - cd modules/ommr4all-server && python managy.py collectstatic --noinput && cd ../..
+        - cd modules/ommr4all-server && python manage.py collectstatic --noinput && cd ../..
         - rm -rf /opt/ommr4all/ommr4all-deploy
         - cp -r $PWD /opt/ommr4all/ommr4all-deploy
 
