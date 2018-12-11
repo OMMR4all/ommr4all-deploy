@@ -13,6 +13,12 @@ deploy-job:
         - ng build
         - cd ../..
 
+        - virtualenv -p python3 ommr4all-venv
+        - source ommr4all-venv/bin/activate
+        - pip install -r modules/ommr4all-server/requirements.txt
+        - cd modules/page-segmentation && python setup.py install && cd ../..
+        - cd modules/ommr4all-line-detection && python setup.py install && cd ../..
         - rm -rf /opt/ommr4all/ommr4all-deploy
         - cp -r $PWD /opt/ommr4all/ommr4all-deploy
+
 
