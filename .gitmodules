@@ -1,12 +1,12 @@
 [submodule "modules/ommr4all-server"]
 	path = modules/ommr4all-server
-	url = https://gitlab2.informatik.uni-wuerzburg.de/OMMR4all/ommr4all-server.git
+	url = git@gitlab2.informatik.uni-wuerzburg.de/OMMR4all/ommr4all-server.git
 [submodule "modules/ommr4all-client"]
 	path = modules/ommr4all-client
-	url = https://gitlab2.informatik.uni-wuerzburg.de/OMMR4all/ommr4all-client.git
+	url = git@gitlab2.informatik.uni-wuerzburg.de/OMMR4all/ommr4all-client.git
 [submodule "modules/ommr4all-line-detection"]
 	path = modules/ommr4all-line-detection
-	url = https://gitlab2.informatik.uni-wuerzburg.de/OMMR4all/ommr4all-line-detection
+	url = git@gitlab2.informatik.uni-wuerzburg.de/OMMR4all/ommr4all-line-detection
 [submodule "modules/page-segmentation"]
 	path = modules/page-segmentation
-	url = https://gitlab2.informatik.uni-wuerzburg.de/chw71yx/page-segmentation.git
+	url = git@gitlab2.informatik.uni-wuerzburg.de/chw71yx/page-segmentation.git
