@@ -1,10 +1,18 @@
 variables:
     GIT_SUBMODULE_STRATEGY: recursive
 
+cache:
+    paths:
+        - modules/ommr4all-client/node_modules/
+
 deploy-job:
     stage: deploy
     script:
         - cd modules/ommr4all-client
         - npm install
         - ng build
+        - cd ../..
+
+        - rm -rf /home/ruth/ommr4all
+        - cp -r $PWD /home/ruth/ommr4all
 
