@@ -1,6 +1,8 @@
+variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+
 deploy-job:
     stage: deploy
     script:
-        - git submodule update --init
         - cd modules/ommr4all-client && npm install
         - cd modules/ommr4all-client && ng build
