@@ -13,6 +13,6 @@ deploy-job:
         - ng build
         - cd ../..
 
-        - rm -rf /home/ruth/ommr4all
-        - cp -r $PWD /home/ruth/ommr4all
+        - rm -rf /opt/ommr4all/ommr4all-deploy
+        - cp -r $PWD /opt/ommr4all/ommr4all-deploy
 
