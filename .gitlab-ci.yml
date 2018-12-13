@@ -17,11 +17,14 @@ deploy-job:
         - virtualenv -p python3 ommr4all-venv
         - source ommr4all-venv/bin/activate
         - pip install -r modules/ommr4all-server/requirements.txt
+        - mkdir -o /opt/ommr4all/storage
         - cd modules/page-segmentation && python setup.py install && cd ../..
         - cd modules/ommr4all-line-detection && python setup.py install && cd ../..
         - cd modules/ommr4all-server && python manage.py collectstatic --noinput && cd ../..
         - cd modules/ommr4all-server && sed -i -e 's/ALLOWED_HOSTS = \[\]/ALLOWED_HOSTS = \["*"\]/g' ommr4all/settings.py && cd ../..
         - cd modules/ommr4all-server && sed -i -e 's/DEBUG = True/DEBUG = False/g' ommr4all/settings.py && cd ../..
+        - cd modules/ommr4all-server && sed -i -e 's#db.sqlite3#/opt/ommr4all/db.sqlite3#g' ommr4all/settings.py && cd ../..
+        - cd modules/ommr4all-server && sed -i -e "s#PRIVATE_MEDIA_URL = '/storage/'#PRIVATE_MEDIA_URL = '/opt/ommr4all/storage/'#g" ommr4all/settings.py && cd ../..
         - cd modules/ommr4all-server && echo SECRET_KEY = \'`python manage.py shell -c "from django.core.management import utils; print(utils.get_random_secret_key())"`\' > ommr4all/settings_new.py && sed -i -e 's/^SECRET_KEY.*//g' ommr4all/settings.py && cat ommr4all/settings.py >> ommr4all/settings_new.py && rm ommr4all/settings.py && mv ommr4all/settings_new.py ommr4all/settings.py && cd ../..
         - rm -rf /opt/ommr4all/ommr4all-deploy && rm -rf /opt/ommr4all/ommr4all-tmp
         - cp -r $PWD /opt/ommr4all/ommr4all-deploy-tmp && mv /opt/ommr4all/ommr4all-deploy-tmp /opt/ommr4all/ommr4all-deploy
