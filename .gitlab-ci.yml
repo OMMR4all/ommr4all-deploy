@@ -8,6 +8,7 @@ cache:
 deploy-job:
     stage: deploy
     script:
+        - set -e
         - cd modules/ommr4all-client
         - npm install
         - ng build
