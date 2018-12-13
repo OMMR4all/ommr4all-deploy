@@ -21,7 +21,7 @@ deploy-job:
         - cd modules/ommr4all-server && python manage.py collectstatic --noinput && cd ../..
         - cd modules/ommr4all-server && sed -i -e 's/ALLOWED_HOSTS = \[\]/ALLOWED_HOSTS = \["*"\]/g' ommr4all/settings.py && cd ../..
         - cd modules/ommr4all-server && sed -i -e 's/DEBUG = True/DEBUG = False/g' ommr4all/settings.py && cd ../..
-        - cd modules/ommr4all-server && sed -i -e 's/^SECRET_KEY.*//g' ommr4all/settings.py && echo SECRET_KEY = \'`python manage.py shell -c "from django.core.management import utils; print(utils.get_random_secret_key())"`\' > ommr4all/settings_new.py && cat ommr4all/settings.py >> ommr4all/settings_new.py && rm ommr4all/settings.py && mv ommr4all/settings_new.py ommr4all/settings.py && cd ../..
+        - cd modules/ommr4all-server && echo SECRET_KEY = \'`python manage.py shell -c "from django.core.management import utils; print(utils.get_random_secret_key())"`\' > ommr4all/settings_new.py && sed -i -e 's/^SECRET_KEY.*//g' ommr4all/settings.py && cat ommr4all/settings.py >> ommr4all/settings_new.py && rm ommr4all/settings.py && mv ommr4all/settings_new.py ommr4all/settings.py && cd ../..
         - rm -rf /opt/ommr4all/ommr4all-deploy && rm -rf /opt/ommr4all/ommr4all-tmp
         - cp -r $PWD /opt/ommr4all/ommr4all-deploy-tmp && mv /opt/ommr4all/ommr4all-deploy-tmp /opt/ommr4all/ommr4all-deploy
 
