@@ -6,7 +6,8 @@ cache:
         - modules/ommr4all-client/node_modules/
 
 deploy-job:
-    only: master
+    only:
+        - master
     stage: deploy
     script:
         - set -e
