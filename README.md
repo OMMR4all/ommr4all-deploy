@@ -38,6 +38,11 @@ Listen 8001
                 Require all granted
         </Directory>
 
+        Alias /assets /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/static/ommr4all-client/assets
+        <Directory /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/static/ommr4all-client/assets>
+                Require all granted
+        </Directory>
+
         Alias /storage /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/storage
         <Directory /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/storage>
                 Require all granted
