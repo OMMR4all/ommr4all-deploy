@@ -20,8 +20,12 @@ deploy-job:
         - source ommr4all-venv/bin/activate
         - pip install -r modules/ommr4all-server/requirements.txt
         - mkdir -p /opt/ommr4all/storage
+
+        - sed -i -e 's/tensorflow_gpu/tensorflow/g' page-segmentation/requirements.txt
+
         - cd modules/page-segmentation && python setup.py install && cd ../..
         - cd modules/ommr4all-line-detection && python setup.py install && cd ../..
+        - cd modules/ommr4all-layout-analysis && python setup.py install && cd ../..
 
         - cd modules/ommr4all-server
         - sed -i -e 's/ALLOWED_HOSTS = \[\]/ALLOWED_HOSTS = \["*"\]/g' ommr4all/settings.py
