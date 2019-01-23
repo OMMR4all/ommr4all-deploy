@@ -21,7 +21,7 @@ deploy-job:
         - pip install -r modules/ommr4all-server/requirements.txt
         - mkdir -p /opt/ommr4all/storage
 
-        - sed -i -e 's/tensorflow_gpu/tensorflow/g' page-segmentation/requirements.txt
+        - sed -i -e 's/tensorflow_gpu/tensorflow/g' modules/page-segmentation/requirements.txt
 
         - cd modules/page-segmentation && python setup.py install && cd ../..
         - cd modules/ommr4all-line-detection && python setup.py install && cd ../..
