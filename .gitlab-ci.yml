@@ -18,10 +18,9 @@ deploy-job:
 
         - virtualenv -p python3 ommr4all-venv
         - source ommr4all-venv/bin/activate
+        - pip install tensorflow
         - pip install -r modules/ommr4all-server/requirements.txt
         - mkdir -p /opt/ommr4all/storage
-
-        - sed -i -e 's/tensorflow_gpu/tensorflow/g' modules/page-segmentation/requirements.txt
 
         - cd modules/page-segmentation && python setup.py install && cd ../..
         - cd modules/ommr4all-line-detection && python setup.py install && cd ../..
