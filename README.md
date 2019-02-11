@@ -3,27 +3,28 @@
 Deployment/Setup of all ommr4all services
 
 ## Requirements
-`sudo apt install nodejs npm python3-pip virtualenv libsm6 libxrender1 libfontconfig1`
-`sudo npm install npm@latest -g`
-`sudo npm install -g @angular/cli`
+* `sudo apt install nodejs npm python3-pip virtualenv libsm6 libxrender1 libfontconfig1`
+* `sudo npm install npm@latest -g`
+* `sudo npm install -g @angular/cli`
 
 ## Python virtualenv and requirements
-`virtualenv -p python3 ommr4all-venv`
-`source ommr4all-venv/bin/activate`
-`pip install -r modules/ommr4all-server/requirements.txt`
-`cd modules/page-segmentation && python setup.py install && cd ../..`
-`cd modules/ommr4all-line-detection && python setup.py install && cd ../..`
-`cd modules/ommr4all-server && python managy.py collectstatic --noinput && cd ../..`
+* `virtualenv -p python3 ommr4all-venv`
+* `source ommr4all-venv/bin/activate`
+* `pip install -r modules/ommr4all-server/requirements.txt`
+* `cd modules/page-segmentation && python setup.py install && cd ../..`
+* `cd modules/ommr4all-line-detection && python setup.py install && cd ../..`
+* `cd modules/ommr4all-server && python managy.py collectstatic --noinput && cd ../..`
 
 ## Install
-cd modules/ommr4all-client && npm install && ng build && cd ../..
+* `cd modules/ommr4all-client && npm install && ng build && cd ../..`
 
 ## Setup apache to serve the app
-`sudo apt install apache2 libapache2-mod-wsgi-py`
-`sudo a2enmod wsgi`
-`sudo service apache2 restart`
+* `sudo apt install apache2 libapache2-mod-wsgi-py`
+* `sudo a2enmod wsgi`
+* `sudo service apache2 restart`
+
 Create file `sudo /etc/apache2/sites-available/ommr4all.conf`
-```
+```apache
 Listen 8001
 <VirtualHost *:8001>
         ErrorLog ${APACHE_LOG_DIR}/ommr4all-error.log
@@ -61,5 +62,6 @@ Listen 8001
         </Directory>
 </VirtualHost>
 ```
-Activate `sudo a2ensite ommr4all`
-`sudo service apache2 restart`
+Activate and restart apache service
+* `sudo a2ensite ommr4all`
+* `sudo service apache2 restart`
