@@ -15,6 +15,7 @@ deploy-job:
         - sed -i -e 's#routerLink="/imprint"#href="https://www.uni-wuerzburg.de/en/sonstiges/imprint-privacy-policy/"#g' src/app/app.component.html
         - npm install
         - ng build
+        - ng build --configuration de
         - cd ../..
 
         - virtualenv -p python3 ommr4all-venv
