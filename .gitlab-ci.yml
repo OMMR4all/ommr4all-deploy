@@ -1,15 +1,30 @@
 variables:
-    GIT_SUBMODULE_STRATEGY: recursive
+  GIT_SUBMODULE_STRATEGY: recursive
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
 
 cache:
-    paths:
-        - modules/ommr4all-client/node_modules/
+  paths:
+    - .cache/pip
+    - test-server-venv/
+    - modules/ommr4all-client/node_modules/
+
+before_script:
+  # setup python3 venv for server testing
+  - virtualenv -p python3 test-server-venv
+  - source test-server-venv/bin/activate
+  - pip install tensorflow
+  - pip install -r modules/ommr4all-server/requirements.txt
+  - cd modules/page-segmentation && python setup.py install && cd ../..
+  - cd modules/ommr4all-line-detection && python setup.py install && cd ../..
+  - cd modules/ommr4all-layout-analysis && python setup.py install && cd ../..
+  - python manage.py migrate
+  - deactivate
 
 stages:
     - test
     - deploy
 
-test-job:
+test-server:
     only:
         - master
     stage: test
@@ -17,17 +32,10 @@ test-job:
         - deployment
     script:
         - set -e
-        - virtualenv -p python3 test-venv
-        - source test-venv/bin/activate
-        - pip install tensorflow
-        - pip install -r requirements.txt
-        - cd modules/page-segmentation && python setup.py install && cd ../..
-        - cd modules/ommr4all-line-detection && python setup.py install && cd ../..
-        - cd modules/ommr4all-layout-analysis && python setup.py install && cd ../..
-        - python manage.py migrate
+        - source test-server-venv/bin/activate
         - python manage.py test
 
-deploy-job:
+deploy-ommr4all:
     only:
         - master
     stage: deploy
