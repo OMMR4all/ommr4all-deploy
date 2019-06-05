@@ -17,7 +17,7 @@ before_script:
   - cd modules/page-segmentation && python setup.py install && cd ../..
   - cd modules/ommr4all-line-detection && python setup.py install && cd ../..
   - cd modules/ommr4all-layout-analysis && python setup.py install && cd ../..
-  - python manage.py migrate
+  - cd modules/ommr4all-server && python manage.py migrate && cd ../..
   - deactivate
 
 stages:
