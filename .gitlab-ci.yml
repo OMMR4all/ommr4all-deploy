@@ -9,6 +9,8 @@ deploy-job:
     only:
         - master
     stage: deploy
+    tags:
+        - deployment
     script:
         - set -e
         - cd modules/ommr4all-client
