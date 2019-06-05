@@ -33,7 +33,7 @@ test-server:
     script:
         - set -e
         - source test-server-venv/bin/activate
-        - python manage.py test
+        - cd modules/ommr4all-server && python manage.py test && cd ../..
 
 deploy-ommr4all:
     only:
