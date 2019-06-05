@@ -5,6 +5,28 @@ cache:
     paths:
         - modules/ommr4all-client/node_modules/
 
+stages:
+    - test
+    - deploy
+
+test-job:
+    only:
+        - master
+    stage: test
+    tags:
+        - deployment
+    script:
+        - set -e
+        - virtualenv -p python3 test-venv
+        - source test-venv/bin/activate
+        - pip install tensorflow
+        - pip install -r requirements.txt
+        - cd modules/page-segmentation && python setup.py install && cd ../..
+        - cd modules/ommr4all-line-detection && python setup.py install && cd ../..
+        - cd modules/ommr4all-layout-analysis && python setup.py install && cd ../..
+        - python manage.py migrate
+        - python manage.py test
+
 deploy-job:
     only:
         - master
