@@ -66,10 +66,17 @@ deploy-ommr4all:
         - sed -i -e 's#db.sqlite3#/opt/ommr4all/db.sqlite3#g' ommr4all/settings.py
         - sed -i -e "s#BASE_DIR, 'storage'#'/opt/ommr4all/storage'#g" ommr4all/settings.py
         - python manage.py collectstatic --noinput
-        - python manage.py migrate
         - if [ ! -f /opt/ommr4all/.secret-key ]; then python manage.py shell -c "from django.core.management import utils; print(utils.get_random_secret_key())" > /opt/ommr4all/.secret-key; fi
         - echo SECRET_KEY = \'`cat /opt/ommr4all/.secret-key`\' > ommr4all/settings_new.py && sed -i -e 's/^SECRET_KEY.*//g' ommr4all/settings.py && cat ommr4all/settings.py >> ommr4all/settings_new.py && rm ommr4all/settings.py && mv ommr4all/settings_new.py ommr4all/settings.py
+
+        # stop the service since now the database is migrated and the new version is delivered
+        - sudo /usr/sbin/service apache2 stop
+
+        - python manage.py migrate
         - cd ../..
 
         - rm -rf /opt/ommr4all/ommr4all-deploy && rm -rf /opt/ommr4all/ommr4all-tmp
         - cp -r $PWD /opt/ommr4all/ommr4all-deploy-tmp && mv /opt/ommr4all/ommr4all-deploy-tmp /opt/ommr4all/ommr4all-deploy
+
+        # restart the service
+        - sudo /usr/sbin/service apache2 start

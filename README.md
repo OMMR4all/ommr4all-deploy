@@ -65,3 +65,14 @@ Listen 8001
 Activate and restart apache service
 * `sudo a2ensite ommr4all`
 * `sudo service apache2 restart`
+
+## Use gitlab-runner for automatic deployment
+
+The `.gitlab-ci.yml` file automatically deploys and updates the ommr4all server to /opt/ommt4all/omm4all-deploy. Follow these steps for setting things up:
+
+#### Allow access to restart the apache2 service
+Add
+```
+gitlab-runner ALL = NOPASSWD: /usr/sbin/service apache2 *
+```
+to `/ets/sudoers`
