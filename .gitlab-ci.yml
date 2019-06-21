@@ -6,6 +6,7 @@ before_script:
 stages:
     - test
     - deploy
+    - cleanup
 
 test-server:
     only:
@@ -77,3 +78,12 @@ deploy-ommr4all:
 
         # restart the service
         - sudo /usr/sbin/service apache2 start
+          
+cleanup:
+    only:
+        - master
+    stage: cleanup
+    tags:
+        - deployment
+    script:
+        - rm -rf *
