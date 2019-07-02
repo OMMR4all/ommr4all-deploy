@@ -70,6 +70,10 @@ deploy-ommr4all:
         # stop the service since now the database is migrated and the new version is delivered
         - sudo /usr/sbin/service apache2 stop
 
+        # backup the database, then migrate
+        - rsync -a /opt/ommr4all/storage/ /opt/ommr4all/storage.backup
+        - rsync -a /opt/ommr4all/db.sqlite/ /opt/ommr4all/db.sqlite.backup
+
         - python manage.py migrate
         - cd ../..
 
