@@ -72,7 +72,7 @@ deploy-ommr4all:
 
         # backup the database, then migrate
         - rsync -a /opt/ommr4all/storage/ /opt/ommr4all/storage.backup
-        - rsync -a /opt/ommr4all/db.sqlite/ /opt/ommr4all/db.sqlite.backup
+        - rsync -a /opt/ommr4all/db.sqlite /opt/ommr4all/db.sqlite.backup
 
         - python manage.py migrate
         - cd ../..
