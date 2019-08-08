@@ -16,9 +16,6 @@ def main():
     # run test script inside the venv
     check_call([python, os.path.join(this_dir, 'deploy', 'run_deploy.py')])
 
-    # cleanup venv
-    shutil.rmtree(venv)
-
 
 if __name__ == "__main__":
     main()
