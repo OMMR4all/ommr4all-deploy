@@ -6,19 +6,18 @@ stages:
   - deploy
   - cleanup
 
-test-server:
+# deploy master
+master-test:
   only:
     - master
-    - tags
   stage: test
   tags:
-    - deployment-production
     - deployment-master
   script:
     - set -e
     - python3 ommr4all-deploy/test.py
 
-deploy-ommr4all-master:
+master-deploy:
   only:
     - master
   stage: deploy
@@ -28,7 +27,27 @@ deploy-ommr4all-master:
     - set -e
     - python3 ommr4all-deploy/deploy.py
 
-deploy-ommr4all-production:
+master-cleanup:
+  only:
+    - master
+  stage: cleanup
+  tags:
+    - deployment-master
+  script:
+    - rm -rf *
+
+# deploy production
+production-test:
+  only:
+    - tags
+  stage: test
+  tags:
+    - deployment-production
+  script:
+    - set -e
+    - python3 ommr4all-deploy/test.py
+
+production-deploy:
   only:
     - tags
   stage: deploy
@@ -36,15 +55,13 @@ deploy-ommr4all-production:
     - deployment-production
   script:
     - set -e
-    - python3 deploy/deploy.py
+    - python3 ommr4all-deploy/deploy.py
 
-cleanup:
+production-cleanup:
   only:
-    - master
     - tags
   stage: cleanup
   tags:
     - deployment-production
-    - deployment-master
   script:
     - rm -rf *
