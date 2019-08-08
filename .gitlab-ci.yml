@@ -1,93 +1,50 @@
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
 
-before_script:
-
 stages:
-    - test
-    - deploy
-    - cleanup
+  - test
+  - deploy
+  - cleanup
 
 test-server:
-    only:
-        - master
-    stage: test
-    tags:
-        - deployment
-    script:
-        - set -e
-        # setup python3 venv for server testing
-        - virtualenv -p python3 test-server-venv
-        - source test-server-venv/bin/activate
-        - pip install tensorflow
-        - pip install -r modules/ommr4all-server/requirements.txt
-        - cd modules/page-segmentation && python setup.py install && cd ../..
-        - cd modules/ommr4all-line-detection && python setup.py install && cd ../..
-        - cd modules/ommr4all-layout-analysis && python setup.py install && cd ../..
+  only:
+    - master
+    - tags
+  stage: test
+  tags:
+    - deployment-production
+    - deployment-master
+  script:
+    - set -e
+    - python3 ommr4all-deploy/test.py
 
-        # run migraion and test
-        - cd modules/ommr4all-server && python manage.py migrate && cd ../..
-        - cd modules/ommr4all-server && python manage.py test && cd ../..
+deploy-ommr4all-master:
+  only:
+    - master
+  stage: deploy
+  tags:
+    - deployment-master
+  script:
+    - set -e
+    - python3 ommr4all-deploy/deploy.py
 
-        # remove venv
-        - deactivate
-        - rm -rf test-server-venv
+deploy-ommr4all-production:
+  only:
+    - tags
+  stage: deploy
+  tags:
+    - deployment-production
+  script:
+    - set -e
+    - python3 deploy/deploy.py
 
-deploy-ommr4all:
-    only:
-        - master
-    stage: deploy
-    tags:
-        - deployment
-    script:
-        - set -e
-        - cd modules/ommr4all-client
-        - sed -i -e 's#routerLink="/imprint"#href="https://www.uni-wuerzburg.de/en/sonstiges/imprint-privacy-policy/"#g' src/app/app.component.html
-        - npm install
-        - ng build --configuration production
-        - ng build --configuration production-de
-        - cd ../..
-
-        - virtualenv -p python3 ommr4all-venv
-        - source ommr4all-venv/bin/activate
-        - pip install tensorflow
-        - pip install -r modules/ommr4all-server/requirements.txt
-        - mkdir -p /opt/ommr4all/storage
-
-        - cd modules/page-segmentation && python setup.py install && cd ../..
-        - cd modules/ommr4all-line-detection && python setup.py install && cd ../..
-        - cd modules/ommr4all-layout-analysis && python setup.py install && cd ../..
-
-        - cd modules/ommr4all-server
-        - sed -i -e 's/ALLOWED_HOSTS = \[\]/ALLOWED_HOSTS = \["*"\]/g' ommr4all/settings.py
-        - sed -i -e 's/DEBUG = True/DEBUG = False/g' ommr4all/settings.py
-        - sed -i -e 's#db.sqlite3#/opt/ommr4all/db.sqlite3#g' ommr4all/settings.py
-        - sed -i -e "s#BASE_DIR, 'storage'#'/opt/ommr4all/storage'#g" ommr4all/settings.py
-        - python manage.py collectstatic --noinput
-        - if [ ! -f /opt/ommr4all/.secret-key ]; then python manage.py shell -c "from django.core.management import utils; print(utils.get_random_secret_key())" > /opt/ommr4all/.secret-key; fi
-        - echo SECRET_KEY = \'`cat /opt/ommr4all/.secret-key`\' > ommr4all/settings_new.py && sed -i -e 's/^SECRET_KEY.*//g' ommr4all/settings.py && cat ommr4all/settings.py >> ommr4all/settings_new.py && rm ommr4all/settings.py && mv ommr4all/settings_new.py ommr4all/settings.py
-
-        # stop the service since now the database is migrated and the new version is delivered
-        - sudo /usr/sbin/service apache2 stop
-
-        # backup the database, then migrate
-        - rsync -a /opt/ommr4all/storage/ /opt/ommr4all/storage.backup
-        - rsync -a /opt/ommr4all/db.sqlite3 /opt/ommr4all/db.sqlite3.backup
-
-        - python manage.py migrate
-        - cd ../..
-
-        - rm -rf /opt/ommr4all/ommr4all-deploy && rm -rf /opt/ommr4all/ommr4all-tmp
-        - cp -r $PWD /opt/ommr4all/ommr4all-deploy-tmp && mv /opt/ommr4all/ommr4all-deploy-tmp /opt/ommr4all/ommr4all-deploy
-
-        # restart the service
-        - sudo /usr/sbin/service apache2 start
-          
 cleanup:
-    only:
-        - master
-    stage: cleanup
-    tags:
-        - deployment
-    script:
-        - rm -rf *
+  only:
+    - master
+    - tags
+  stage: cleanup
+  tags:
+    - deployment-production
+    - deployment-master
+  script:
+    - rm -rf *
