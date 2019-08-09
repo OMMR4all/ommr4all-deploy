@@ -62,7 +62,7 @@ def main():
     settings = settings.replace("BASE_DIR, 'storage'", "'{}'".format(storage_dir))
     settings = re.sub(r"SECRET_KEY = .*", "SECRET_KEY = {}".format(random_secret_key), settings)
 
-    with open('ommr4all/settings', 'w') as f:
+    with open('ommr4all/settings.py', 'w') as f:
         f.write(settings)
 
     logger.info("Collecting static files")
