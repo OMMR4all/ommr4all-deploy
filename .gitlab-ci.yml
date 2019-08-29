@@ -6,6 +6,26 @@ stages:
   - deploy
   - cleanup
 
+# dev testing
+dev-test:
+  only:
+    - dev
+  stage: test
+  tags:
+    - deployment-master
+  script:
+    - set -e
+    - python3 ommr4all-deploy/test.py
+
+dev-cleanup:
+  only:
+    - dev
+  stage: cleanup
+  tags:
+    - deployment-master
+  script:
+    - rm -rf *
+
 # deploy master
 master-test:
   only:

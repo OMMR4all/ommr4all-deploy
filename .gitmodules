@@ -9,7 +9,7 @@
 	url = ../ommr4all-line-detection.git
 [submodule "modules/page-segmentation"]
 	path = modules/page-segmentation
-	url = ../../chw71yx/page-segmentation.git
+	url = https://gitlab2.informatik.uni-wuerzburg.de/ls6/page-segmentation.git
 [submodule "modules/ommr4all-layout-analysis"]
 	path = modules/ommr4all-layout-analysis
 	url = ../ommr4all-layout-analysis.git
