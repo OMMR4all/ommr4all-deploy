@@ -75,7 +75,7 @@ production-deploy:
     - deployment-production
   script:
     - set -e
-    - python3 ommr4all-deploy/deploy.py
+    - python3 ommr4all-deploy/deploy.py --gpu
 
 production-cleanup:
   only:

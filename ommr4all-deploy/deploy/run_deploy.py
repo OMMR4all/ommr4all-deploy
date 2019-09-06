@@ -5,6 +5,7 @@ from distutils.dir_util import copy_tree
 import shutil
 import sys
 import logging
+import argparse
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,10 @@ pip = os.path.join(os.path.dirname(python), 'pip')
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--gpu", action='store_true')
+    args = parser.parse_args()
+
     os.chdir(root_dir)
 
     logger.info("Setting up client")
@@ -31,7 +36,7 @@ def main():
 
     logger.info("Setting up virtual environment and dependencies")
     os.chdir(root_dir)
-    check_call([pip, 'install', 'tensorflow'])
+    check_call([pip, 'install', 'tensorflow_gpu' if args.gpu else 'tensorflow'])
     check_call([pip, 'install', '-r', 'modules/ommr4all-server/requirements.txt'])
     for submodule in ['page-segmentation', 'ommr4all-line-detection', 'ommr4all-layout-analysis']:
         os.chdir('modules/' + submodule)
