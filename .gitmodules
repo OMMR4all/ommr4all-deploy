@@ -7,12 +7,12 @@
 [submodule "modules/ommr4all-line-detection"]
 	path = modules/ommr4all-line-detection
 	url = ../ommr4all-line-detection.git
-[submodule "modules/page-segmentation"]
-	path = modules/page-segmentation
-	url = https://gitlab2.informatik.uni-wuerzburg.de/ls6/page-segmentation.git
 [submodule "modules/ommr4all-layout-analysis"]
 	path = modules/ommr4all-layout-analysis
 	url = ../ommr4all-layout-analysis.git
 [submodule "modules/calamari"]
 	path = modules/calamari
 	url = https://github.com/Calamari-OCR/calamari.git
+[submodule "modules/ommr4all-page-segmentation"]
+	path = modules/ommr4all-page-segmentation
+	url = ../ommr4all-page-segmentation
