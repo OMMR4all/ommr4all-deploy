@@ -2,77 +2,44 @@
 
 Deployment/Setup of all ommr4all services
 
-## Requirements
-* `sudo apt install nodejs npm python3-pip virtualenv libsm6 libxrender1 libfontconfig1`
-* `sudo npm install npm@latest -g`
-* `sudo npm install -g @angular/cli`
+## Deployment-Setup with Docker
+You can setup OMMR4all using [`docker`](https://www.docker.com/) and `docker-compose`.
 
-## Python virtualenv and requirements
-* `virtualenv -p python3 ommr4all-venv`
-* `source ommr4all-venv/bin/activate`
-* `pip install -r modules/ommr4all-server/requirements.txt`
-* `cd modules/page-segmentation && python setup.py install && cd ../..`
-* `cd modules/ommr4all-line-detection && python setup.py install && cd ../..`
-* `cd modules/ommr4all-server && python managy.py collectstatic --noinput && cd ../..`
-
-## Install
-* `cd modules/ommr4all-client && npm install && ng build && cd ../..`
-
-## Setup apache to serve the app
-* `sudo apt install apache2 libapache2-mod-wsgi-py`
-* `sudo a2enmod wsgi`
-* `sudo service apache2 restart`
-
-Create file `sudo /etc/apache2/sites-available/ommr4all.conf`
-```apache
-Listen 8001
-<VirtualHost *:8001>
-        ErrorLog ${APACHE_LOG_DIR}/ommr4all-error.log
-        CustomLog ${APACHE_LOG_DIR}/ommr4all-access.log combined
-
-        WSGIPassAuthorization Off
-        WSGIDaemonProcess ommr4all python-home=/opt/ommr4all/ommr4all-deploy/ommr4all-venv python-path=/opt/ommr4all/ommr4all-deploy/modules/ommr4all-server
-        WSGIProcessGroup ommr4all
-
-        Alias /static /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/static
-        <Directory /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/static>
-                Require all granted
-        </Directory>
-
-        Alias /assets /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/static/ommr4all-client/assets
-        <Directory /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/static/ommr4all-client/assets>
-                Require all granted
-        </Directory>
-
-        Alias /storage /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/storage
-        <Directory /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/storage>
-                Require all granted
-        </Directory>
-
-        # Alias /media /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/media
-        # <Directory /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/media>
-        #         Require all granted
-        # </Directory>
-
-        WSGIScriptAlias / /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/ommr4all/wsgi.py
-        <Directory /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/ommr4all>
-                <Files wsgi.py>
-                        Require all granted
-                </Files>
-        </Directory>
-</VirtualHost>
+### Initial setup
+1. Download and install `docker-ce` and `docker-compose` for your platform.
+2. Download the [`docker-compose.yml`](https://github.com/OMMR4all/ommr4all-deploy/blob/master/docker-compose.yml) file.
+3. Open `docker-compose.yml` and replace `${STORAGE}` and the `${PORT}` to your wishes (e.g., use `/opt/ommr4all-storage` and `8001`).
+4. Build the container and bring it up:
+```shell script
+docker-compose up -d
 ```
-Activate and restart apache service
-* `sudo a2ensite ommr4all`
-* `sudo service apache2 restart`
-
-## Use gitlab-runner for automatic deployment
-
-The `.gitlab-ci.yml` file automatically deploys and updates the ommr4all server to /opt/ommt4all/omm4all-deploy. Follow these steps for setting things up:
-
-#### Allow access to restart the apache2 service
-Add
+5. Create a super user:
+```shell script
+docker-compose run /opt/ommr4all/ommr4all-deploy-venv/bin/python /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/manage.py createsuperuser
 ```
-gitlab-runner ALL = NOPASSWD: /usr/sbin/service apache2 *
-```
-to `/ets/sudoers`
+
+### Updating
+1. `docker-compose pull`
+2. `docker-compuse up`
+
+You can run `docker image prune -f` to clean all previous versions or older images that are currently unused.
+
+## Deployment-Setup without docker
+
+Follow the instructions in the `Dockerfile`.
+You can also setup a `gitlab-runner` for automatic deployment (Clone the project on github.com with CI-integration), create a runner with either
+* `deployment-production`: redeploy if a new (version) tag was added
+* `deployment-master`: redeploy if the master is updated
+
+## Development-Setup (Any operating system)
+
+These instructions are not complete yet.
+
+1. Download and install all requirements (node>=10, >=python3.6)
+2. Install the IDEs (IntelliJ, or PyCharm and WebStorm)
+3. Create a virtual environment, activate it, and install your desired tensorflow version (e.g., `pip install tensorflow_gpu<2`)
+4. Install all python submodules (located in the `modules` directure) but the server: `python setup.py install`.
+5. Install the server `requirements.txt`: `pip install -r requirements.txt`.
+6. Open the ommr4all-client directory in WebStorm and launch the `Angluar CLI Server`.
+7. Open the ommr4all-sever directory in PyCharm and launch the `Django Server`.
+8. In WebStorm launch the `Angular Application` which will open a browser.

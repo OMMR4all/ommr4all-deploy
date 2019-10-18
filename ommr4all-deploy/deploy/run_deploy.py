@@ -13,7 +13,7 @@ this_dir = os.path.dirname(os.path.realpath(__file__))
 root_dir = os.path.abspath(os.path.join(this_dir, '..', '..'))
 ommr4all_dir = '/opt/ommr4all'
 storage_dir = os.path.join(ommr4all_dir, 'storage')
-db_file = os.path.join(ommr4all_dir, 'db.sqlite')
+db_file_name = 'db.sqlite'
 secret_key = os.path.join(ommr4all_dir, '.secret_key')
 python = sys.executable
 pip = os.path.join(os.path.dirname(python), 'pip')
@@ -21,8 +21,11 @@ pip = os.path.join(os.path.dirname(python), 'pip')
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--dbdir", default=ommr4all_dir)
     parser.add_argument("--gpu", action='store_true')
     args = parser.parse_args()
+
+    db_file = os.path.join(args.dbdir, db_file_name)
 
     os.chdir(root_dir)
 

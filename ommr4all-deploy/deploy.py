@@ -11,6 +11,7 @@ python = os.path.join(venv, 'bin', 'python')
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', action='store_true')
+    parser.add_argument("--dbdir")
 
     args = parser.parse_args()
 
@@ -20,7 +21,9 @@ def main():
     check_call(['virtualenv',  '-p', 'python3', venv])
 
     # run test script inside the venv
-    check_call([python, os.path.join(this_dir, 'deploy', 'run_deploy.py')] + (['--gpu'] if args.gpu else []))
+    check_call([python, os.path.join(this_dir, 'deploy', 'run_deploy.py')] +
+               (['--gpu'] if args.gpu else []) +
+               (['--dbdir', args.dbdir] if args.dbdir else []))
 
 
 if __name__ == "__main__":
