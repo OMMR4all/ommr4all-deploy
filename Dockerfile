@@ -28,7 +28,7 @@ RUN npm install npm@latest -g && npm install -g @angular/cli
 RUN mkdir -p /opt
 
 # clone code and all its dependencies
-RUN git clone --recursive http://github.com/OMMR4all/ommr4all-deploy && cd ommr4all-deploy && git checkout docker
+RUN git clone --recursive http://github.com/OMMR4all/ommr4all-deploy
 
 # setup apache
 RUN cp ommr4all-deploy/ommr4all-deploy/deploy/apache2.conf /etc/apache2/sites-available/ommr4all.conf && a2ensite ommr4all.conf && apachectl configtest
