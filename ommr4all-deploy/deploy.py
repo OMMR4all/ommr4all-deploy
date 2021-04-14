@@ -18,7 +18,7 @@ def main():
     os.chdir(this_dir)
 
     # setup python3 venv for server testing
-    check_call(['virtualenv',  '-p', 'python3.7', venv])
+    check_call(['virtualenv',  '-p', 'python3', venv])
 
     # run test script inside the venv
     check_call([python, os.path.join(this_dir, 'deploy', 'run_deploy.py')] +
