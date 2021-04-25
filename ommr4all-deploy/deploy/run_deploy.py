@@ -77,7 +77,7 @@ def main():
     check_call([python, 'manage.py', 'collectstatic', '--noinput'])
 
     logger.info("Migrating database and copying new version")
-    call(['/usr/sbin/service', 'apache2', 'stop'])
+    call(['sudo', '/bin/systemctl', 'stop',  'apache2.service'])
 
     # backup files
     copy_tree(storage_dir, storage_dir + '.backup')
@@ -93,7 +93,8 @@ def main():
     copy_tree(root_dir, os.path.join(ommr4all_dir, 'ommr4all-deploy'))
 
     # finally restart the service
-    call(['/usr/sbin/service', 'apache2', 'start'])
+
+    call(['sudo', '/bin/systemctl', 'start',  'apache2.service'])
     logger.info("Setup finished")
 
 
