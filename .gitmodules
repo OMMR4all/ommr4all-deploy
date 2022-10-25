@@ -16,3 +16,6 @@
 [submodule "modules/ommr4all-page-segmentation"]
 	path = modules/ommr4all-page-segmentation
 	url = ../ommr4all-page-segmentation
+[submodule "modules/nautilus"]
+	path = modules/nautilus
+	url = https://github.com/Gawajn/nautilus.git
