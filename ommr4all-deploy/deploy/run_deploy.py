@@ -41,7 +41,7 @@ def main():
     os.chdir(root_dir)
     check_call([pip, 'install', 'tensorflow_gpu~=2.4.0' if args.gpu else 'tensorflow~=2.4.0'])
     check_call([pip, 'install', '-r', 'modules/ommr4all-server/requirements.txt'])
-    for submodule in ['ommr4all-page-segmentation', 'ommr4all-line-detection', 'ommr4all-layout-analysis', 'calamari']:
+    for submodule in ['ommr4all-page-segmentation', 'ommr4all-line-detection', 'ommr4all-layout-analysis']:
         os.chdir('modules/' + submodule)
         check_call([python, 'setup.py', 'install'])
         os.chdir(root_dir)
