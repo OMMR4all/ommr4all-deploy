@@ -15,9 +15,9 @@ def main():
     os.chdir(root_dir)
 
     # setup python3 venv for server testing
-    check_call([pip, 'install', 'tensorflow~=2.4.0'])
+    #check_call([pip, 'install', 'tensorflow~=2.4.0'])
     check_call([pip, 'install', '-r', 'modules/ommr4all-server/requirements.txt'])
-    for submodule in ['ommr4all-page-segmentation', 'ommr4all-line-detection', 'ommr4all-layout-analysis']:
+    for submodule in ['ommr4all-line-detection', 'ommr4all-layout-analysis']: #'ommr4all-page-segmentation',
         os.chdir('modules/' + submodule)
 
         # check if hash = version in server is equal to the actual submodule
