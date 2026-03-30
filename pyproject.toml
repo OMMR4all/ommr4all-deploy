@@ -1,0 +1,24 @@
+[project]
+name = "ommr4all-deploy"
+version = "0.1.0"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ommr4all-server",
+    "ommr4all-line-detection",
+    "ommr4all-layout-analysis",
+]
+
+[tool.uv.workspace]
+members = ["modules/*"]
+exclude = [
+    "modules/calamari",
+    "modules/nautilus",
+    "modules/ommr4all-client",
+    "modules/ommr4all-page-segmentation",
+
+]
+[tool.uv.sources]
+ommr4all-server = { workspace = true }
+ommr4all-line-detection = { workspace = true }
+ommr4all-layout-analysis = { workspace = true }
