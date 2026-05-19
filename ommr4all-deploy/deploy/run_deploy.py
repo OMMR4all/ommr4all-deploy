@@ -30,7 +30,7 @@ def main():
     logger.info("Setting up client")
     os.chdir('modules/ommr4all-client')
     check_call(['sed', '-i', '-e', 's#routerLink="/imprint"#href="https://www.uni-wuerzburg.de/en/sonstiges/imprint-privacy-policy/"#g', 'src/app/app.component.html'])
-    check_call(['npm', 'ci'])
+    check_call(['npm', 'install'])
     for config in ['production', 'production-de']:
         check_call(['node_modules/.bin/ng', 'build', '--configuration', config])
 
