@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     git \
     wget curl gnupg \
     python3 python3-pip python3-venv python3-dev \
-    libsm6 libxrender1 libfontconfig1 \
+    libsm6 libxrender1 libfontconfig1 libgl1 \
     apache2 libapache2-mod-wsgi-py3 \
     && rm -rf /var/lib/apt/lists/*
 
