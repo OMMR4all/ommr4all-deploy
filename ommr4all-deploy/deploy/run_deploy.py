@@ -71,7 +71,9 @@ def main():
     check_call([python, 'manage.py', 'collectstatic', '--noinput'])
 
     logger.info("Migrating database and copying new version")
-    call(['sudo', '/bin/systemctl', 'stop', 'apache2.service'])
+    # systemctl only available on bare-metal (not inside Docker)
+    if os.path.exists('/bin/systemctl'):
+        call(['sudo', '/bin/systemctl', 'stop', 'apache2.service'])
 
     # backup files
     shutil.copytree(storage_dir, storage_dir + '.backup', dirs_exist_ok=True)
@@ -87,8 +89,9 @@ def main():
     shutil.rmtree(deploy_target, ignore_errors=True)
     shutil.copytree(root_dir, deploy_target)
 
-    # finally restart the service
-    call(['sudo', '/bin/systemctl', 'start', 'apache2.service'])
+    # finally restart the service (bare-metal only)
+    if os.path.exists('/bin/systemctl'):
+        call(['sudo', '/bin/systemctl', 'start', 'apache2.service'])
     logger.info("Setup finished")
 
 
