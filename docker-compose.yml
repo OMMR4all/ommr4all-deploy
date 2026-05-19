@@ -15,3 +15,9 @@ services:
     command: bash -c "/opt/ommr4all/ommr4all-deploy-venv/bin/python /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/manage.py migrate --noinput && chmod 666 /opt/ommr4all/storage/db.sqlite3 && chmod o+w /opt/ommr4all/storage"
     volumes:
       - ${STORAGE}:/opt/ommr4all/storage
+  test:
+    image: uniwue/ommr4all
+    build: .
+    profiles:
+      - test
+    command: bash -c "cd /opt/ommr4all/ommr4all-deploy-src && python3 ommr4all-deploy/test.py"
