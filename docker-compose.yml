@@ -12,6 +12,6 @@ services:
   migration:
     image: uniwue/ommr4all
     build: .
-    command: /opt/ommr4all/ommr4all-deploy-venv/bin/python /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/manage.py migrate --noinput
+    command: bash -c "/opt/ommr4all/ommr4all-deploy-venv/bin/python /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/manage.py migrate --noinput && chmod 666 /opt/ommr4all/storage/db.sqlite3 && chmod o+w /opt/ommr4all/storage"
     volumes:
       - ${STORAGE}:/opt/ommr4all/storage

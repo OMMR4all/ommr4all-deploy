@@ -34,6 +34,24 @@ def main():
     for config in ['production', 'production-de']:
         check_call(['node_modules/.bin/ng', 'build', '--configuration', config])
 
+    logger.info("Copying Angular build output to server static directory")
+    os.chdir(root_dir)
+    client_dist_dir = os.path.join(root_dir, 'modules', 'ommr4all-client', 'dist')
+    server_static_dir = os.path.join(root_dir, 'modules', 'ommr4all-server', 'webapp', 'static')
+    os.makedirs(server_static_dir, exist_ok=True)
+    for dist_name, locale in [('ommr4all-client', None), ('ommr4all-client-de', 'de')]:
+        dst = os.path.join(server_static_dir, dist_name)
+        shutil.rmtree(dst, ignore_errors=True)
+        # Angular 17+ puts build output in browser/ (and localized builds add a locale subdir)
+        browser_dir = os.path.join(client_dist_dir, dist_name, 'browser')
+        if locale and os.path.isdir(os.path.join(browser_dir, locale)):
+            src = os.path.join(browser_dir, locale)
+        elif os.path.isdir(browser_dir):
+            src = browser_dir
+        else:
+            src = os.path.join(client_dist_dir, dist_name)
+        shutil.copytree(src, dst)
+
     logger.info("Setting up virtual environment and dependencies")
     os.chdir(root_dir)
     check_call(['uv', 'pip', 'install', '--python', python, '-r', 'modules/ommr4all-server/requirements.txt'])
