@@ -6,7 +6,6 @@ from runpy import run_path
 this_dir = os.path.dirname(os.path.realpath(__file__))
 root_dir = os.path.abspath(os.path.join(this_dir, '..', '..'))
 python = sys.executable
-pip = os.path.join(os.path.dirname(python), 'pip')
 
 server_test_manager = run_path(os.path.join(root_dir, 'modules', 'ommr4all-server', 'tests', 'manage_gitlab-ci.py'))
 
@@ -14,10 +13,8 @@ server_test_manager = run_path(os.path.join(root_dir, 'modules', 'ommr4all-serve
 def main():
     os.chdir(root_dir)
 
-    # setup python3 venv for server testing
-    #check_call([pip, 'install', 'tensorflow~=2.4.0'])
-    check_call([pip, 'install', '-r', 'modules/ommr4all-server/requirements.txt'])
-    for submodule in ['ommr4all-line-detection', 'ommr4all-layout-analysis']: #'ommr4all-page-segmentation',
+    check_call(['uv', 'pip', 'install', '--python', python, '-r', 'modules/ommr4all-server/requirements.txt'])
+    for submodule in ['ommr4all-line-detection', 'ommr4all-layout-analysis']:
         os.chdir('modules/' + submodule)
 
         # check if hash = version in server is equal to the actual submodule
@@ -29,8 +26,7 @@ def main():
         if hash != server_hash:
             raise ValueError("Error while processing {}: Server hash {} is not equal to submodule hash {}. You probably must upgrade the modules.".format(submodule, server_hash, hash))
 
-        # install this version
-        check_call([python, 'setup.py', 'install'])
+        check_call(['uv', 'pip', 'install', '--python', python, '-e', '.'])
         os.chdir(root_dir)
 
     # run migration and test

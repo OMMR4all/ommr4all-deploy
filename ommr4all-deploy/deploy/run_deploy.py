@@ -1,7 +1,6 @@
 from subprocess import check_call, call
 import os
 import re
-from distutils.dir_util import copy_tree
 import shutil
 import sys
 import logging
@@ -16,7 +15,6 @@ storage_dir = os.path.join(ommr4all_dir, 'storage')
 db_file_name = 'db.sqlite'
 secret_key = os.path.join(ommr4all_dir, '.secret_key')
 python = sys.executable
-pip = os.path.join(os.path.dirname(python), 'pip')
 
 
 def main():
@@ -32,19 +30,15 @@ def main():
     logger.info("Setting up client")
     os.chdir('modules/ommr4all-client')
     check_call(['sed', '-i', '-e', 's#routerLink="/imprint"#href="https://www.uni-wuerzburg.de/en/sonstiges/imprint-privacy-policy/"#g', 'src/app/app.component.html'])
-    check_call(['npm', 'install'])
-    check_call(['npm', 'audit', 'fix'])
+    check_call(['npm', 'ci'])
     for config in ['production', 'production-de']:
-        check_call(['ng', 'build', '--configuration', config])
+        check_call(['node_modules/.bin/ng', 'build', '--configuration', config])
 
     logger.info("Setting up virtual environment and dependencies")
     os.chdir(root_dir)
-    #check_call([pip, 'install', 'tensorflow_gpu~=2.4.0' if args.gpu else 'tensorflow~=2.4.0'])
-    check_call([pip, 'install', '-r', 'modules/ommr4all-server/requirements.txt'])
-    for submodule in ['ommr4all-line-detection', 'ommr4all-layout-analysis']: #'ommr4all-page-segmentation'
-        os.chdir('modules/' + submodule)
-        check_call([python, 'setup.py', 'install'])
-        os.chdir(root_dir)
+    check_call(['uv', 'pip', 'install', '--python', python, '-r', 'modules/ommr4all-server/requirements.txt'])
+    for submodule in ['ommr4all-line-detection', 'ommr4all-layout-analysis']:
+        check_call(['uv', 'pip', 'install', '--python', python, '-e', os.path.join('modules', submodule)])
 
     os.chdir(root_dir)
     os.makedirs(storage_dir, exist_ok=True)
@@ -77,24 +71,24 @@ def main():
     check_call([python, 'manage.py', 'collectstatic', '--noinput'])
 
     logger.info("Migrating database and copying new version")
-    call(['sudo', '/bin/systemctl', 'stop',  'apache2.service'])
+    call(['sudo', '/bin/systemctl', 'stop', 'apache2.service'])
 
     # backup files
-    copy_tree(storage_dir, storage_dir + '.backup')
+    shutil.copytree(storage_dir, storage_dir + '.backup', dirs_exist_ok=True)
     shutil.rmtree(db_file + '.backup', ignore_errors=True)
     if os.path.exists(db_file):
         shutil.copyfile(db_file, db_file + '.backup')
 
     check_call([python, 'manage.py', 'migrate'])
 
-    # copy new version and remove all
+    # copy new version
     os.chdir(root_dir)
-    shutil.rmtree(os.path.join(ommr4all_dir, 'ommr4all-deploy'), ignore_errors=True)
-    copy_tree(root_dir, os.path.join(ommr4all_dir, 'ommr4all-deploy'))
+    deploy_target = os.path.join(ommr4all_dir, 'ommr4all-deploy')
+    shutil.rmtree(deploy_target, ignore_errors=True)
+    shutil.copytree(root_dir, deploy_target)
 
     # finally restart the service
-
-    call(['sudo', '/bin/systemctl', 'start',  'apache2.service'])
+    call(['sudo', '/bin/systemctl', 'start', 'apache2.service'])
     logger.info("Setup finished")
 
 

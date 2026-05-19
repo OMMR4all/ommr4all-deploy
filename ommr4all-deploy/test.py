@@ -10,13 +10,13 @@ python = os.path.join(venv, 'bin', 'python')
 def main():
     os.chdir(this_dir)
 
-    # setup python3 venv for server testing
-    check_call(['virtualenv',  '-p', 'python3.8', venv])
+    # Create virtual environment with uv (Python 3.12+)
+    check_call(['uv', 'venv', venv, '--python', 'python3.12'])
 
-    # run test script inside the venv
+    # Run test script inside the venv
     check_call([python, os.path.join(this_dir, 'test', 'run_test.py')])
 
-    # cleanup venv
+    # Cleanup venv
     shutil.rmtree(venv)
 
 
