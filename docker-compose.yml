@@ -7,6 +7,14 @@ services:
       - "${PORT}:8001"
     volumes:
       - ${STORAGE}:/opt/ommr4all/storage
+    environment:
+      # optional LLM providers for the text_llm transcription step;
+      # leave empty to offer only the local Chandra model in the client
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_API_URL=${OPENAI_API_URL:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-}
     depends_on:
       - migration
   migration:
