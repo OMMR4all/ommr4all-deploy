@@ -2282,11 +2282,10 @@ wheels = [
 
 [[package]]
 name = "pixel-classifier-torch"
-version = "0.2.2.3"
-source = { git = "https://github.com/Gawajn/segmentation-pytorch.git#421586d4f184080ea744d4c7a28f3233c15b32c2" }
+version = "0.2.2.4"
+source = { git = "https://github.com/Gawajn/segmentation-pytorch.git#042d94567e915f0ce5248985620912655131c1ea" }
 dependencies = [
     { name = "albumentations" },
-    { name = "dataclasses" },
     { name = "dataclasses-json" },
     { name = "doxapy" },
     { name = "efficientnet-pytorch" },
