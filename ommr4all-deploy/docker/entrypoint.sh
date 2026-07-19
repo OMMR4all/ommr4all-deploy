@@ -1,20 +1,30 @@
 #!/usr/bin/env bash
 # Container entrypoint.
 # 1. Ensures the storage directory exists.
-# 2. Runs Django database migrations.
-# 3. Creates a superuser if DJANGO_SUPERUSER_* vars are set and no superuser exists yet.
-# 4. Execs the CMD (apachectl -D FOREGROUND).
+# 2. Backs up the SQLite database, then runs Django migrations.
+# 3. Makes the database/storage writable for the Apache (www-data) workers.
+# 4. Creates a superuser if DJANGO_SUPERUSER_* vars are set and none exists yet.
+# 5. Execs the CMD (apachectl -D FOREGROUND).
 
 set -euo pipefail
 
-PYTHON=/opt/ommr4all/ommr4all-deploy/.venv/bin/python
+PYTHON=/opt/ommr4all/ommr4all-deploy-venv/bin/python
 MANAGE=/opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/manage.py
 STORAGE=/opt/ommr4all/storage
+DB="$STORAGE/db.sqlite3"
 
 mkdir -p "$STORAGE"
 
+if [[ -f "$DB" ]]; then
+    echo "==> Backing up database to db.sqlite3.backup..."
+    cp "$DB" "$DB.backup"
+fi
+
 echo "==> Running database migrations..."
 "$PYTHON" "$MANAGE" migrate --noinput
+
+chmod 666 "$DB"
+chmod o+w "$STORAGE"
 
 # Auto-create superuser when DJANGO_SUPERUSER_USERNAME is set and no superuser exists yet.
 if [[ -n "${DJANGO_SUPERUSER_USERNAME:-}" ]]; then
@@ -30,5 +40,4 @@ if [[ -n "${DJANGO_SUPERUSER_USERNAME:-}" ]]; then
     fi
 fi
 
-echo "==> Starting Apache..."
 exec "$@"

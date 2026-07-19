@@ -1,3 +1,22 @@
-*
-!pyproject.toml
-!uv.lock
+# Keep the build context small: the image gets the local checkout via COPY,
+# so exclude everything heavy or host-specific.
+.git
+**/.git
+.env
+.claude
+__pycache__
+**/__pycache__
+**/*.pyc
+*~
+*.swp
+storage
+modules/ommr4all-server/storage
+modules/ommr4all-client/node_modules
+modules/ommr4all-client/dist
+test-server-venv
+**/.venv
+mockup
+torchtest.py
+Claude.Containerfile
+opencode.Containerfile
+*.backup

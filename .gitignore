@@ -3,3 +3,10 @@
 *venv
 *Thumbs.db*
 mockup
+.env
+.claude/
+__pycache__/
+*.pyc
+*~
+*.backup
+test-server-venv

@@ -13,11 +13,12 @@ def main():
     # Create virtual environment with uv (Python 3.12+)
     check_call(['uv', 'venv', venv, '--python', 'python3.12'])
 
-    # Run test script inside the venv
-    check_call([python, os.path.join(this_dir, 'test', 'run_test.py')])
-
-    # Cleanup venv
-    shutil.rmtree(venv)
+    try:
+        # Run test script inside the venv
+        check_call([python, os.path.join(this_dir, 'test', 'run_test.py')])
+    finally:
+        # Cleanup venv (also on test failure)
+        shutil.rmtree(venv, ignore_errors=True)
 
 
 if __name__ == "__main__":

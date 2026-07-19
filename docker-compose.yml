@@ -1,13 +1,17 @@
-version: '3'
 services:
   web:
     image: uniwue/ommr4all
     build: .
+    restart: unless-stopped
     ports:
       - "${PORT}:8001"
     volumes:
       - ${STORAGE}:/opt/ommr4all/storage
     environment:
+      # optional superuser auto-creation on first start (see .env.example)
+      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-}
+      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-}
+      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-}
       # optional LLM providers for the text_llm transcription step;
       # leave empty to offer only the local Chandra model in the client
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
@@ -15,17 +19,43 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_API_URL=${OPENAI_API_URL:-}
       - OPENAI_MODEL=${OPENAI_MODEL:-}
+      # channel layer shared with the ws service so HTTP-triggered events reach websockets
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - migration
-  migration:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8001/api/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+  # daphne serves the ASGI/websocket side (/ws is proxied here by Apache);
+  # mod_wsgi in the web service is WSGI-only and cannot speak websockets
+  ws:
     image: uniwue/ommr4all
     build: .
-    command: bash -c "/opt/ommr4all/ommr4all-deploy-venv/bin/python /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/manage.py migrate --noinput && chmod 666 /opt/ommr4all/storage/db.sqlite3 && chmod o+w /opt/ommr4all/storage"
+    restart: unless-stopped
+    entrypoint: []
+    working_dir: /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server
+    command: /opt/ommr4all/ommr4all-deploy-venv/bin/daphne -b 0.0.0.0 -p 8002 --proxy-headers ommr4all.routing:application
+    environment:
+      - DJANGO_SETTINGS_MODULE=ommr4all.settings
+      - REDIS_URL=redis://redis:6379/0
     volumes:
       - ${STORAGE}:/opt/ommr4all/storage
+    depends_on:
+      redis:
+        condition: service_started
+      web:
+        # migrations are applied by the web entrypoint
+        condition: service_healthy
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
   test:
     image: uniwue/ommr4all
     build: .
     profiles:
       - test
+    entrypoint: []
     command: bash -c "cd /opt/ommr4all/ommr4all-deploy-src && python3 ommr4all-deploy/test.py"

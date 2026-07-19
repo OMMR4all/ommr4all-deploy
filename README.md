@@ -1,45 +1,79 @@
 # OMMR4all-deploy
 
-Deployment/Setup of all ommr4all services
+Deployment/Setup of all OMMR4all services.
 
-## Deployment-Setup with Docker
-You can setup OMMR4all using [`docker`](https://www.docker.com/) and `docker-compose`.
+## Deployment with Docker
+
+Requires [Docker](https://www.docker.com/) with the Compose plugin (or the
+standalone `docker-compose` binary).
 
 ### Initial setup
-1. Download and install `docker-ce` and `docker-compose` for your platform.
-2. Download the [`docker-compose.yml`](https://github.com/OMMR4all/ommr4all-deploy/blob/master/docker-compose.yml) file.
-3. Open `docker-compose.yml` and replace `${STORAGE}` and the `${PORT}` to your wishes (e.g., use `/opt/ommr4all-storage` and `8001`).
-4. Build the container and bring it up:
-```shell script
-docker-compose up -d
-```
-5. Create a super user:
-```shell script
-docker-compose run /opt/ommr4all/ommr4all-deploy-venv/bin/python /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/manage.py createsuperuser
+
+1. Copy the example configuration and adjust it:
+   ```shell
+   cp .env.example .env
+   # edit .env: PORT, STORAGE, optional DJANGO_SUPERUSER_* and LLM API keys
+   ```
+2. (Optional) Select submodule branches in `.env` and check them out:
+   ```shell
+   ./setup_branches.sh
+   ```
+3. Build and start:
+   ```shell
+   ./start.sh            # add --gpu for NVIDIA GPU passthrough, --no-cache for a full rebuild
+   ```
+
+The image is built from your **local checkout** (including the submodule
+branches you have checked out). On container start the entrypoint backs up the
+SQLite database, applies migrations, and — if `DJANGO_SUPERUSER_USERNAME` is
+set in `.env` — creates the initial superuser automatically.
+
+Three services are started: `web` (Apache + mod_wsgi), `ws` (daphne, serves
+`/ws` websockets proxied through Apache) and `redis` (shared channel layer).
+
+To create a superuser manually instead:
+```shell
+docker compose exec web /opt/ommr4all/ommr4all-deploy-venv/bin/python \
+  /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/manage.py createsuperuser
 ```
 
 ### Updating
-1. `docker-compose pull`
-2. `docker-compuse up`
 
-You can run `docker image prune -f` to clean all previous versions or older images that are currently unused.
+```shell
+git pull --recurse-submodules
+./start.sh
+```
 
-## Deployment-Setup without docker
+Run `docker image prune -f` to clean up unused older images.
 
-Follow the instructions in the `Dockerfile`.
-You can also setup a `gitlab-runner` for automatic deployment (Clone the project on github.com with CI-integration), create a runner with either
-* `deployment-production`: redeploy if a new (version) tag was added
-* `deployment-master`: redeploy if the master is updated
+### Stopping
 
-## Development-Setup (Any operating system)
+```shell
+./start.sh --stop
+```
 
-These instructions are not complete yet.
+## Deployment without Docker
 
-1. Download and install all requirements (node>=10, >=python3.6)
-2. Install the IDEs (IntelliJ, or PyCharm and WebStorm)
-3. Create a virtual environment, activate it, and install your desired tensorflow version (e.g., `pip install tensorflow_gpu<2`)
-4. Install all python submodules (located in the `modules` directure) but the server: `python setup.py install`.
-5. Install the server `requirements.txt`: `pip install -r requirements.txt`.
-6. Open the ommr4all-client directory in WebStorm and launch the `Angluar CLI Server`.
-7. Open the ommr4all-sever directory in PyCharm and launch the `Django Server`.
-8. In WebStorm launch the `Angular Application` which will open a browser.
+Follow the steps in the `Dockerfile` (Apache2 + mod_wsgi, venv at
+`/opt/ommr4all/ommr4all-deploy-venv`, `python3 ommr4all-deploy/deploy.py`).
+For automatic deployment a `gitlab-runner` can be registered with either tag:
+* `deployment-production`: redeploy when a new version tag is added
+* `deployment-master`: redeploy when `master` is updated
+
+## Development setup
+
+See `CLAUDE.md` for the full, up-to-date instructions. Short version
+(requires Python ≥3.12, Node.js ≥20, `uv`):
+
+```shell
+# Backend
+uv sync                                   # from the repo root
+cd modules/ommr4all-server
+python manage.py migrate
+python manage.py runserver
+
+# Frontend
+cd modules/ommr4all-client
+npm install
+npm start                                 # English; npm run start-de for German
+```

@@ -102,22 +102,23 @@ Three environments map to three deployment paths:
 ## Docker
 
 ```bash
-# Build and start (set STORAGE and PORT env vars first)
-docker-compose up -d
+# Configure, then build and start
+cp .env.example .env      # edit PORT, STORAGE, DJANGO_SUPERUSER_*, LLM keys
+./start.sh                # --gpu for GPU passthrough, --no-cache for full rebuild, --stop to stop
 
-# Create superuser
-docker-compose run /opt/ommr4all/ommr4all-deploy-venv/bin/python \
+# Create superuser manually (automatic on first start when DJANGO_SUPERUSER_* is set in .env)
+docker compose exec web /opt/ommr4all/ommr4all-deploy-venv/bin/python \
   /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/manage.py createsuperuser
 ```
 
-The image is `uniwue/ommr4all`, exposes port 8001, mounts storage at `${STORAGE}:/opt/ommr4all/storage`, and serves via Apache2 + mod_wsgi.
+The image is `uniwue/ommr4all`, built from the **local checkout** (heavy paths excluded via `.dockerignore`), exposes port 8001, mounts storage at `${STORAGE}:/opt/ommr4all/storage`, and serves via Apache2 + mod_wsgi. The container entrypoint (`ommr4all-deploy/docker/entrypoint.sh`) backs up the SQLite DB, runs migrations, and creates the superuser before starting Apache.
 
 ## Key Architecture Notes
 
 - **Django settings** are dynamically rewritten during deployment (`run_deploy.py` patches `ALLOWED_HOSTS`, `DEBUG`, `SECRET_KEY`, and the database path via sed).
 - **Static files** are collected by `manage.py collectstatic` during deploy and served by Apache under an alias; in dev they are served by Django or the Angular dev server.
-- **WebSocket support** is provided by Django Channels; routing is in `modules/ommr4all-server/ommr4all/routing.py`.
-- **Package manager**: The workspace uses `uv` (see `pyproject.toml` and `uv.lock`). The legacy deploy scripts still create pip-based virtualenvs targeting Python 3.8; the workspace itself requires Python ≥3.12.
+- **WebSocket support** is provided by Django Channels; routing is in `modules/ommr4all-server/ommr4all/routing.py`. In the Docker setup a separate `ws` service runs daphne (ASGI) with a Redis channel layer and Apache proxies `/ws` to it via `mod_proxy_wstunnel`; the dev server uses the in-memory channel layer.
+- **Package manager**: The workspace uses `uv` (see `pyproject.toml` and `uv.lock`). The deploy scripts create uv-based virtualenvs targeting Python 3.12 (`deploy.py` at `/opt/ommr4all/ommr4all-deploy-venv`).
 - **Submodule hashes** are validated during test runs by `tests/manage_gitlab-ci.py` — if submodules are updated, that file must be updated accordingly.
 - **Multi-locale build**: The Angular client ships two variants (English default + German `production-de`); `ng build --configuration production` for English, `ng build --configuration production-de` for German.
 

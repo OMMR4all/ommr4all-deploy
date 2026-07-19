@@ -12,7 +12,7 @@ this_dir = os.path.dirname(os.path.realpath(__file__))
 root_dir = os.path.abspath(os.path.join(this_dir, '..', '..'))
 ommr4all_dir = '/opt/ommr4all'
 storage_dir = os.path.join(ommr4all_dir, 'storage')
-db_file_name = 'db.sqlite'
+db_file_name = 'db.sqlite3'  # must match the filename in ommr4all/settings.py
 secret_key = os.path.join(ommr4all_dir, '.secret_key')
 python = sys.executable
 
@@ -77,9 +77,20 @@ def main():
 
     settings = settings.replace('ALLOWED_HOSTS = []', 'ALLOWED_HOSTS = ["*"]')
     settings = settings.replace('DEBUG = True', 'DEBUG = False')
-    settings = settings.replace('db.sqlite', '{}'.format(db_file))
+    settings = settings.replace("os.path.join(BASE_DIR, 'db.sqlite3')", "'{}'".format(db_file))
     settings = settings.replace("BASE_DIR, 'storage'", "'{}'".format(storage_dir))
     settings = re.sub(r"SECRET_KEY = .*", "SECRET_KEY = '{}'".format(random_secret_key), settings)
+
+    # The string replacements above silently no-op if the upstream settings.py
+    # formatting changes — fail the deploy instead of shipping dev settings.
+    for marker in ['ALLOWED_HOSTS = ["*"]',
+                   'DEBUG = False',
+                   db_file,
+                   "'{}'".format(storage_dir),
+                   "SECRET_KEY = '{}'".format(random_secret_key)]:
+        if marker not in settings:
+            raise RuntimeError('Patching settings.py failed: {!r} not found after rewrite. '
+                               'Check the replace patterns against the current settings.py.'.format(marker))
 
     with open('ommr4all/settings.py', 'w') as f:
         f.write(settings)
