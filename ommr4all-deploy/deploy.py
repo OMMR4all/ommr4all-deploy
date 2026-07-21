@@ -1,10 +1,39 @@
-from subprocess import check_call
+from subprocess import check_call, check_output
 import os
+import sys
+import shutil
 import argparse
 
 this_dir = os.path.dirname(os.path.realpath(__file__))
 venv = '/opt/ommr4all/ommr4all-deploy-venv'
 python = os.path.join(venv, 'bin', 'python')
+
+MIN_NODE_MAJOR = 20  # Angular 21 requires Node.js >= 20
+
+
+def preflight(check_node):
+    """Fail fast (before any venv/build work) if the runner lacks the toolchain.
+
+    Runs while the old site is still up, so a clear message here beats a cryptic
+    failure once the deploy is already touching Apache/the database.
+    """
+    if shutil.which('uv') is None:
+        sys.exit("Pre-flight check failed: 'uv' is not on PATH. Install uv "
+                 "(https://docs.astral.sh/uv/) on this runner; the deploy/test scripts "
+                 "require it to build the Python 3.12 virtualenv.")
+    if check_node:
+        if shutil.which('node') is None:
+            sys.exit("Pre-flight check failed: 'node' is not on PATH. The Angular 21 client "
+                     "build requires Node.js >= {}.".format(MIN_NODE_MAJOR))
+        version = check_output(['node', '--version']).decode().strip()  # e.g. 'v22.22.2'
+        try:
+            major = int(version.lstrip('v').split('.')[0])
+        except (ValueError, IndexError):
+            sys.exit("Pre-flight check failed: could not parse Node.js version from "
+                     "{!r}.".format(version))
+        if major < MIN_NODE_MAJOR:
+            sys.exit("Pre-flight check failed: Node.js >= {} required for the Angular 21 "
+                     "client build; runner has {}.".format(MIN_NODE_MAJOR, version))
 
 
 def main():
@@ -13,6 +42,8 @@ def main():
     parser.add_argument("--dbdir")
 
     args = parser.parse_args()
+
+    preflight(check_node=True)
 
     os.chdir(this_dir)
 

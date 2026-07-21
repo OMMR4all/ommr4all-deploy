@@ -21,7 +21,17 @@ if [[ -f "$DB" ]]; then
 fi
 
 echo "==> Running database migrations..."
-"$PYTHON" "$MANAGE" migrate --noinput
+if ! "$PYTHON" "$MANAGE" migrate --noinput; then
+    echo "!! Database migration failed." >&2
+    if [[ -f "$DB.backup" ]]; then
+        echo "!! Restoring database from $DB.backup (pre-migration state)." >&2
+        cp "$DB.backup" "$DB"
+    fi
+    echo "!! Aborting startup so the database is not left half-migrated." >&2
+    echo "!! The pre-migration backup is preserved at $DB.backup." >&2
+    echo "!! Fix the migration issue and restart the container." >&2
+    exit 1
+fi
 
 chmod 666 "$DB"
 chmod o+w "$STORAGE"

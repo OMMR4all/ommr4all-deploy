@@ -16,6 +16,40 @@ db_file_name = 'db.sqlite3'  # must match the filename in ommr4all/settings.py
 secret_key = os.path.join(ommr4all_dir, '.secret_key')
 python = sys.executable
 
+DISK_MARGIN_BYTES = 1 * 1024 ** 3  # headroom required beyond the storage backup copy
+
+
+def dir_size(path):
+    """Total size (bytes) of a directory tree, ignoring entries we can't stat."""
+    total = 0
+    for entry in os.scandir(path):
+        try:
+            if entry.is_dir(follow_symlinks=False):
+                total += dir_size(entry.path)
+            elif entry.is_file(follow_symlinks=False):
+                total += entry.stat(follow_symlinks=False).st_size
+        except OSError:
+            pass
+    return total
+
+
+def guard_disk_space(path):
+    """Abort *before* Apache is stopped if the disk can't hold the storage backup.
+
+    The backup step duplicates the whole storage tree; running out of space
+    mid-migration would leave the site down, so fail early while it is still up.
+    """
+    if not os.path.isdir(path):
+        return
+    needed = dir_size(path) + DISK_MARGIN_BYTES
+    free = shutil.disk_usage(path).free
+    if free < needed:
+        raise RuntimeError(
+            "Not enough free disk space to safely back up storage before migrating: "
+            "need ~{:.1f} GiB, have {:.1f} GiB free at {}. Free space (e.g. prune the old "
+            "'{}.backup') and re-run.".format(
+                needed / 1024 ** 3, free / 1024 ** 3, path, path))
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -53,6 +87,13 @@ def main():
 
     logger.info("Setting up virtual environment and dependencies")
     os.chdir(root_dir)
+    if args.gpu:
+        # Install CUDA (cu121) torch/torchvision first; requirements.txt pins them
+        # unpinned, so the install below sees them satisfied and keeps the GPU build.
+        logger.info("Installing CUDA (cu121) torch/torchvision for --gpu")
+        check_call(['uv', 'pip', 'install', '--python', python,
+                    'torch', 'torchvision',
+                    '--index-url', 'https://download.pytorch.org/whl/cu121'])
     check_call(['uv', 'pip', 'install', '--python', python, '-r', 'modules/ommr4all-server/requirements.txt'])
     for submodule in ['ommr4all-line-detection', 'ommr4all-layout-analysis']:
         check_call(['uv', 'pip', 'install', '--python', python, '-e', os.path.join('modules', submodule)])
@@ -99,27 +140,49 @@ def main():
     check_call([python, 'manage.py', 'collectstatic', '--noinput'])
 
     logger.info("Migrating database and copying new version")
+
     # systemctl only available on bare-metal (not inside Docker)
-    if os.path.exists('/bin/systemctl'):
-        call(['sudo', '/bin/systemctl', 'stop', 'apache2.service'])
+    has_systemctl = os.path.exists('/bin/systemctl')
 
-    # backup files
-    shutil.copytree(storage_dir, storage_dir + '.backup', dirs_exist_ok=True)
-    shutil.rmtree(db_file + '.backup', ignore_errors=True)
-    if os.path.exists(db_file):
-        shutil.copyfile(db_file, db_file + '.backup')
+    def apache(action):
+        if has_systemctl:
+            call(['sudo', '/bin/systemctl', action, 'apache2.service'])
 
-    check_call([python, 'manage.py', 'migrate'])
+    # Defensive guard: bail out while the site is still up if the disk can't
+    # hold the storage backup taken below.
+    guard_disk_space(storage_dir)
 
-    # copy new version
-    os.chdir(root_dir)
-    deploy_target = os.path.join(ommr4all_dir, 'ommr4all-deploy')
-    shutil.rmtree(deploy_target, ignore_errors=True)
-    shutil.copytree(root_dir, deploy_target)
+    db_backup = db_file + '.backup'
 
-    # finally restart the service (bare-metal only)
-    if os.path.exists('/bin/systemctl'):
-        call(['sudo', '/bin/systemctl', 'start', 'apache2.service'])
+    apache('stop')
+    try:
+        # backup files
+        shutil.copytree(storage_dir, storage_dir + '.backup', dirs_exist_ok=True)
+        shutil.rmtree(db_backup, ignore_errors=True)
+        if os.path.exists(db_file):
+            shutil.copyfile(db_file, db_backup)
+
+        try:
+            check_call([python, 'manage.py', 'migrate'])
+        except Exception:
+            # Migration failed with Apache stopped. Restore the DB and leave the
+            # already-deployed code untouched (we haven't copied the new version
+            # yet), so the old, working site comes back up on restart below.
+            logger.error("Migration failed; restoring database from backup and aborting "
+                         "deploy (previously deployed version left in place).")
+            if os.path.exists(db_backup):
+                shutil.copyfile(db_backup, db_file)
+            raise
+
+        # copy new version (only after a successful migration)
+        os.chdir(root_dir)
+        deploy_target = os.path.join(ommr4all_dir, 'ommr4all-deploy')
+        shutil.rmtree(deploy_target, ignore_errors=True)
+        shutil.copytree(root_dir, deploy_target)
+    finally:
+        # Always bring Apache back up, even if the migration or copy failed.
+        apache('start')
+
     logger.info("Setup finished")
 
 
