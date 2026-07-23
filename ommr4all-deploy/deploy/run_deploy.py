@@ -55,6 +55,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dbdir", default=ommr4all_dir)
     parser.add_argument("--gpu", action='store_true')
+    parser.add_argument("--gpu-legacy", dest='gpu_legacy', action='store_true',
+                        help="Install a Pascal-compatible torch (sm_61, e.g. GTX 10xx) "
+                             "instead of the default CUDA build.")
     args = parser.parse_args()
 
     db_file = os.path.join(args.dbdir, db_file_name)
@@ -87,16 +90,34 @@ def main():
 
     logger.info("Setting up virtual environment and dependencies")
     os.chdir(root_dir)
-    if args.gpu:
+    # Extra args threaded into the requirements + editable installs below. For the
+    # legacy (Pascal) GPU build we add a constraints file so a transitive floor can't
+    # silently upgrade torch past the pinned, sm_61-compatible version.
+    constrain = []
+    if args.gpu_legacy:
+        # PyTorch dropped Pascal (sm_61, e.g. GTX 10xx) in 2.8; 2.7.1+cu126 is the
+        # newest build that still ships those kernels. Pin it, then constrain the
+        # later installs so nothing bumps it back to an unsupported release.
+        logger.info("Installing Pascal-compatible torch 2.7.1+cu126 (sm_61, e.g. GTX 10xx)")
+        check_call(['uv', 'pip', 'install', '--python', python,
+                    'torch==2.7.1', 'torchvision==0.22.1',
+                    '--index-url', 'https://download.pytorch.org/whl/cu126'])
+        constraints_file = os.path.join(root_dir, '.torch-pascal-constraints.txt')
+        with open(constraints_file, 'w') as f:
+            f.write('torch==2.7.1\ntorchvision==0.22.1\n')
+        constrain = ['-c', constraints_file]
+    elif args.gpu:
         # Install CUDA (cu121) torch/torchvision first; requirements.txt pins them
         # unpinned, so the install below sees them satisfied and keeps the GPU build.
         logger.info("Installing CUDA (cu121) torch/torchvision for --gpu")
         check_call(['uv', 'pip', 'install', '--python', python,
                     'torch', 'torchvision',
                     '--index-url', 'https://download.pytorch.org/whl/cu121'])
-    check_call(['uv', 'pip', 'install', '--python', python, '-r', 'modules/ommr4all-server/requirements.txt'])
+    check_call(['uv', 'pip', 'install', '--python', python] + constrain +
+               ['-r', 'modules/ommr4all-server/requirements.txt'])
     for submodule in ['ommr4all-line-detection', 'ommr4all-layout-analysis']:
-        check_call(['uv', 'pip', 'install', '--python', python, '-e', os.path.join('modules', submodule)])
+        check_call(['uv', 'pip', 'install', '--python', python] + constrain +
+                   ['-e', os.path.join('modules', submodule)])
 
     os.chdir(root_dir)
     os.makedirs(storage_dir, exist_ok=True)

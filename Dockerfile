@@ -40,9 +40,13 @@ RUN cp /opt/ommr4all/ommr4all-deploy-src/ommr4all-deploy/deploy/apache2.conf \
     && a2ensite ommr4all.conf \
     && apachectl configtest
 
-# Run deploy script
+# Run deploy script.
+# GPU_MODE=legacy bakes a Pascal-compatible torch (sm_61, e.g. GTX 10xx) into the
+# image; otherwise the default CPU/PyPI torch is installed (start.sh sets this).
+ARG GPU_MODE=
 RUN cd /opt/ommr4all/ommr4all-deploy-src \
-    && python3 ommr4all-deploy/deploy.py --dbdir /opt/ommr4all/storage
+    && if [ "$GPU_MODE" = "legacy" ]; then EXTRA=--gpu-legacy; fi \
+    && python3 ommr4all-deploy/deploy.py --dbdir /opt/ommr4all/storage $EXTRA
 
 # Entrypoint backs up + migrates the DB and creates the superuser (from
 # DJANGO_SUPERUSER_* env vars) before handing over to Apache

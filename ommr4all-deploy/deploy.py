@@ -39,6 +39,9 @@ def preflight(check_node):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', action='store_true')
+    parser.add_argument('--gpu-legacy', dest='gpu_legacy', action='store_true',
+                        help="Install a Pascal-compatible torch (sm_61, e.g. GTX 10xx) "
+                             "instead of the default CUDA build.")
     parser.add_argument("--dbdir")
 
     args = parser.parse_args()
@@ -53,6 +56,7 @@ def main():
     # Run deploy script inside the venv
     check_call([python, os.path.join(this_dir, 'deploy', 'run_deploy.py')] +
                (['--gpu'] if args.gpu else []) +
+               (['--gpu-legacy'] if args.gpu_legacy else []) +
                (['--dbdir', args.dbdir] if args.dbdir else []))
 
 

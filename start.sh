@@ -5,6 +5,9 @@
 # Options:
 #   --gpu         Pass the NVIDIA GPU into the container (needs nvidia-container-toolkit).
 #                 Can be combined with --no-cache:  ./start.sh --gpu --no-cache
+#   --gpu-legacy  Like --gpu, but builds the image with a Pascal-compatible torch
+#                 (sm_61, e.g. GTX 10xx). Recent torch dropped Pascal support; this
+#                 bakes torch 2.7.1+cu126 into the image. Pair with --no-cache to rebuild.
 #   --no-cache    Force a full rebuild (no Docker layer cache)
 #   --stop        Stop and remove the running container
 
@@ -22,6 +25,8 @@ fi
 
 NO_CACHE=0
 GPU=0
+GPU_MODE=""
+export GPU_MODE
 for arg in "$@"; do
     case "$arg" in
         --stop)
@@ -34,6 +39,12 @@ for arg in "$@"; do
             ;;
         --gpu)
             GPU=1
+            ;;
+        --gpu-legacy)
+            GPU=1
+            # Bake a Pascal-compatible torch into the image (see Dockerfile ARG GPU_MODE)
+            GPU_MODE=legacy
+            export GPU_MODE
             ;;
         *)
             echo "Unknown option: $arg" >&2
@@ -64,7 +75,11 @@ PORT=$(grep -E '^PORT=' .env 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
 PORT=${PORT:-8001}
 echo "OMMR4all is starting at http://localhost:${PORT}"
 if [[ "$GPU" == 1 ]]; then
-    echo "GPU passthrough enabled. Verify with:"
+    if [[ "$GPU_MODE" == legacy ]]; then
+        echo "GPU passthrough enabled (Pascal-compatible torch 2.7.1+cu126 baked in). Verify with:"
+    else
+        echo "GPU passthrough enabled. Verify with:"
+    fi
     echo "  docker compose exec web /opt/ommr4all/ommr4all-deploy-venv/bin/python -c 'import torch; print(torch.cuda.is_available())'"
 fi
 echo "Logs: docker compose logs -f"

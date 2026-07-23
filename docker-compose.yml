@@ -1,7 +1,12 @@
 services:
   web:
     image: uniwue/ommr4all
-    build: .
+    build:
+      context: .
+      # GPU_MODE=legacy (set by `start.sh --gpu-legacy`) bakes a Pascal-compatible
+      # torch into the image; empty means the default build.
+      args:
+        GPU_MODE: ${GPU_MODE:-}
     restart: unless-stopped
     ports:
       - "${PORT}:8001"
@@ -33,7 +38,10 @@ services:
   # mod_wsgi in the web service is WSGI-only and cannot speak websockets
   ws:
     image: uniwue/ommr4all
-    build: .
+    build:
+      context: .
+      args:
+        GPU_MODE: ${GPU_MODE:-}
     restart: unless-stopped
     entrypoint: []
     working_dir: /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server
