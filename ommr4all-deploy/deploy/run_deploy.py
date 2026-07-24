@@ -69,6 +69,11 @@ def main():
     parser.add_argument("--gpu-legacy", dest='gpu_legacy', action='store_true',
                         help="Install a Pascal-compatible torch (sm_61, e.g. GTX 10xx) "
                              "instead of the default CUDA build.")
+    parser.add_argument("--skip-storage-backup", dest='skip_storage_backup', action='store_true',
+                        help="Skip copying the storage tree to storage.backup before migrating "
+                             "(and the disk-space guard for it). Use when storage is large and "
+                             "backed up elsewhere; note you lose the automatic storage rollback "
+                             "if the deploy fails.")
     args = parser.parse_args()
 
     db_file = os.path.join(args.dbdir, db_file_name)
@@ -205,15 +210,20 @@ def main():
 
     # Defensive guard: bail out while the site is still up if the disk can't
     # hold the storage backup taken below.
-    guard_disk_space(storage_dir)
+    if not args.skip_storage_backup:
+        guard_disk_space(storage_dir)
 
     db_backup = db_file + '.backup'
 
     apache('stop')
     try:
         # backup files
-        logger.info("Backing up storage tree %s -> %s", storage_dir, storage_dir + '.backup')
-        shutil.copytree(storage_dir, storage_dir + '.backup', dirs_exist_ok=True)
+        if args.skip_storage_backup:
+            logger.warning("Skipping storage backup (--skip-storage-backup): no automatic "
+                           "storage rollback if this deploy fails")
+        else:
+            logger.info("Backing up storage tree %s -> %s", storage_dir, storage_dir + '.backup')
+            shutil.copytree(storage_dir, storage_dir + '.backup', dirs_exist_ok=True)
         shutil.rmtree(db_backup, ignore_errors=True)
         if os.path.exists(db_file):
             logger.info("Backing up database %s -> %s", db_file, db_backup)
@@ -240,7 +250,14 @@ def main():
         deploy_target = os.path.join(ommr4all_dir, 'ommr4all-deploy')
         logger.info("Deploying new version: %s -> %s", root_dir, deploy_target)
         shutil.rmtree(deploy_target, ignore_errors=True)
-        shutil.copytree(root_dir, deploy_target)
+        try:
+            shutil.copytree(root_dir, deploy_target)
+        except Exception:
+            # copytree can raise a shutil.Error bundling many per-file failures
+            # (e.g. broken symlinks in the checkout); log the full detail so the
+            # cause is visible in the deploy output, then re-raise to abort.
+            logger.exception("Failed to copy new version %s -> %s", root_dir, deploy_target)
+            raise
         logger.info("New version copied into place")
     finally:
         # Always bring Apache back up, even if the migration or copy failed.
@@ -250,4 +267,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        # Make sure the traceback lands in the deploy log/stderr before the
+        # process exits non-zero, rather than being lost or truncated.
+        logger.exception("run_deploy failed with an unhandled exception")
+        raise

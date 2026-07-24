@@ -52,6 +52,9 @@ def main():
     parser.add_argument('--gpu-legacy', dest='gpu_legacy', action='store_true',
                         help="Install a Pascal-compatible torch (sm_61, e.g. GTX 10xx) "
                              "instead of the default CUDA build.")
+    parser.add_argument('--skip-storage-backup', dest='skip_storage_backup', action='store_true',
+                        help="Skip backing up the storage tree before migrating (forwarded to "
+                             "run_deploy.py). Use when storage is large and backed up elsewhere.")
     parser.add_argument("--dbdir")
 
     args = parser.parse_args()
@@ -88,9 +91,14 @@ def main():
     check_call([python, os.path.join(this_dir, 'deploy', 'run_deploy.py')] +
                (['--gpu'] if args.gpu else []) +
                (['--gpu-legacy'] if args.gpu_legacy else []) +
+               (['--skip-storage-backup'] if args.skip_storage_backup else []) +
                (['--dbdir', args.dbdir] if args.dbdir else []))
     logger.info("Deploy finished successfully")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        logger.exception("Deploy failed with an unhandled exception")
+        raise
