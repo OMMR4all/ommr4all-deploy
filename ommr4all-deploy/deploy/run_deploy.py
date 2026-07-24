@@ -6,6 +6,14 @@ import sys
 import logging
 import argparse
 
+# run_deploy.py runs as its own process (spawned by deploy.py), so it needs its
+# own logging config: without basicConfig the root logger defaults to WARNING
+# and every logger.info/debug below is silently dropped. Override the verbosity
+# with DEPLOY_LOGLEVEL=INFO to make deploy output quieter.
+logging.basicConfig(
+    level=os.environ.get('DEPLOY_LOGLEVEL', 'DEBUG').upper(),
+    format='%(asctime)s %(name)-24s %(levelname)-8s %(message)s',
+)
 logger = logging.getLogger(__name__)
 
 this_dir = os.path.dirname(os.path.realpath(__file__))
@@ -40,9 +48,12 @@ def guard_disk_space(path):
     mid-migration would leave the site down, so fail early while it is still up.
     """
     if not os.path.isdir(path):
+        logger.debug("Disk-space guard: %s does not exist yet, nothing to back up", path)
         return
     needed = dir_size(path) + DISK_MARGIN_BYTES
     free = shutil.disk_usage(path).free
+    logger.info("Disk-space guard for %s: need ~%.2f GiB (incl. %.0f GiB margin), have %.2f GiB free",
+                path, needed / 1024 ** 3, DISK_MARGIN_BYTES / 1024 ** 3, free / 1024 ** 3)
     if free < needed:
         raise RuntimeError(
             "Not enough free disk space to safely back up storage before migrating: "
@@ -62,13 +73,23 @@ def main():
 
     db_file = os.path.join(args.dbdir, db_file_name)
 
+    logger.info("run_deploy starting (gpu=%s, gpu_legacy=%s)", args.gpu, args.gpu_legacy)
+    logger.debug("root_dir=%s", root_dir)
+    logger.debug("ommr4all_dir=%s", ommr4all_dir)
+    logger.debug("storage_dir=%s", storage_dir)
+    logger.debug("db_file=%s", db_file)
+    logger.debug("python (venv interpreter)=%s", python)
+
     os.chdir(root_dir)
 
     logger.info("Setting up client")
     os.chdir('modules/ommr4all-client')
+    logger.debug("Patching imprint link in src/app/app.component.html")
     check_call(['sed', '-i', '-e', 's#routerLink="/imprint"#href="https://www.uni-wuerzburg.de/en/sonstiges/imprint-privacy-policy/"#g', 'src/app/app.component.html'])
+    logger.info("Running 'npm install' for the Angular client")
     check_call(['npm', 'install'])
     for config in ['production', 'production-de']:
+        logger.info("Building Angular client (configuration=%s)", config)
         check_call(['node_modules/.bin/ng', 'build', '--configuration', config])
 
     logger.info("Copying Angular build output to server static directory")
@@ -86,6 +107,7 @@ def main():
             src = browser_dir
         else:
             src = os.path.join(client_dist_dir, dist_name)
+        logger.info("Copying client build %s -> %s", src, dst)
         shutil.copytree(src, dst, dirs_exist_ok=True)
 
     logger.info("Setting up virtual environment and dependencies")
@@ -113,13 +135,17 @@ def main():
         check_call(['uv', 'pip', 'install', '--python', python,
                     'torch', 'torchvision',
                     '--index-url', 'https://download.pytorch.org/whl/cu121'])
+    logger.info("Installing server requirements (modules/ommr4all-server/requirements.txt)")
     check_call(['uv', 'pip', 'install', '--python', python] + constrain +
                ['-r', 'modules/ommr4all-server/requirements.txt'])
     for submodule in ['ommr4all-line-detection', 'ommr4all-layout-analysis']:
+        logger.info("Installing editable submodule: %s", submodule)
         check_call(['uv', 'pip', 'install', '--python', python] + constrain +
                    ['-e', os.path.join('modules', submodule)])
+    logger.info("Dependency installation complete")
 
     os.chdir(root_dir)
+    logger.debug("Ensuring storage directory exists: %s", storage_dir)
     os.makedirs(storage_dir, exist_ok=True)
 
     logger.info("Changing server settings")
@@ -127,9 +153,12 @@ def main():
 
     # create/read secret key
     if not os.path.exists(secret_key):
+        logger.info("Generating new Django secret key at %s", secret_key)
         from django.core.management import utils
         with open(secret_key, 'w') as f:
             f.write(utils.get_random_secret_key())
+    else:
+        logger.debug("Reusing existing Django secret key at %s", secret_key)
 
     with open(secret_key, 'r') as f:
         random_secret_key = f.read()
@@ -153,9 +182,11 @@ def main():
         if marker not in settings:
             raise RuntimeError('Patching settings.py failed: {!r} not found after rewrite. '
                                'Check the replace patterns against the current settings.py.'.format(marker))
+    logger.debug("settings.py patch markers verified (ALLOWED_HOSTS, DEBUG, db path, storage, SECRET_KEY)")
 
     with open('ommr4all/settings.py', 'w') as f:
         f.write(settings)
+    logger.info("Wrote patched production settings.py")
 
     logger.info("Collecting static files")
     check_call([python, 'manage.py', 'collectstatic', '--noinput'])
@@ -164,9 +195,12 @@ def main():
 
     # systemctl only available on bare-metal (not inside Docker)
     has_systemctl = os.path.exists('/bin/systemctl')
+    logger.debug("systemctl available: %s (Apache will %sbe managed)",
+                 has_systemctl, '' if has_systemctl else 'NOT ')
 
     def apache(action):
         if has_systemctl:
+            logger.info("Apache: %s apache2.service", action)
             call(['sudo', '/bin/systemctl', action, 'apache2.service'])
 
     # Defensive guard: bail out while the site is still up if the disk can't
@@ -178,13 +212,19 @@ def main():
     apache('stop')
     try:
         # backup files
+        logger.info("Backing up storage tree %s -> %s", storage_dir, storage_dir + '.backup')
         shutil.copytree(storage_dir, storage_dir + '.backup', dirs_exist_ok=True)
         shutil.rmtree(db_backup, ignore_errors=True)
         if os.path.exists(db_file):
+            logger.info("Backing up database %s -> %s", db_file, db_backup)
             shutil.copyfile(db_file, db_backup)
+        else:
+            logger.debug("No existing database at %s to back up", db_file)
 
         try:
+            logger.info("Running database migrations")
             check_call([python, 'manage.py', 'migrate'])
+            logger.info("Migrations applied successfully")
         except Exception:
             # Migration failed with Apache stopped. Restore the DB and leave the
             # already-deployed code untouched (we haven't copied the new version
@@ -198,8 +238,10 @@ def main():
         # copy new version (only after a successful migration)
         os.chdir(root_dir)
         deploy_target = os.path.join(ommr4all_dir, 'ommr4all-deploy')
+        logger.info("Deploying new version: %s -> %s", root_dir, deploy_target)
         shutil.rmtree(deploy_target, ignore_errors=True)
         shutil.copytree(root_dir, deploy_target)
+        logger.info("New version copied into place")
     finally:
         # Always bring Apache back up, even if the migration or copy failed.
         apache('start')

@@ -2,7 +2,17 @@ from subprocess import check_call, check_output
 import os
 import sys
 import shutil
+import logging
 import argparse
+
+# Configure logging so the info/debug statements below (and in run_deploy.py)
+# are actually emitted; without this the root logger defaults to WARNING and
+# swallows them. Override with DEPLOY_LOGLEVEL=INFO to make the output quieter.
+logging.basicConfig(
+    level=os.environ.get('DEPLOY_LOGLEVEL', 'DEBUG').upper(),
+    format='%(asctime)s %(name)-24s %(levelname)-8s %(message)s',
+)
+logger = logging.getLogger(__name__)
 
 this_dir = os.path.dirname(os.path.realpath(__file__))
 venv = '/opt/ommr4all/ommr4all-deploy-venv'
@@ -46,18 +56,40 @@ def main():
 
     args = parser.parse_args()
 
+    logger.info("Starting deploy (gpu=%s, gpu_legacy=%s, dbdir=%s)",
+                args.gpu, args.gpu_legacy, args.dbdir or '<default>')
+
+    logger.debug("Running pre-flight toolchain checks")
     preflight(check_node=True)
+    logger.debug("Pre-flight checks passed")
 
     os.chdir(this_dir)
 
+    # Recreate the virtual environment from scratch so a stale or partially
+    # installed venv from an earlier (possibly failed) deploy can never leak
+    # into this one. A fresh venv guarantees the dependency installs below
+    # start from a clean slate.
+    if os.path.isdir(venv):
+        logger.info("Removing existing virtual environment at %s for a fresh install", venv)
+        shutil.rmtree(venv)
+    elif os.path.exists(venv):
+        # path exists but is not a directory (unexpected) — clear the stray entry
+        logger.warning("Found non-directory at venv path %s; removing it", venv)
+        os.remove(venv)
+    else:
+        logger.debug("No existing virtual environment at %s", venv)
+
     # Create virtual environment with uv (Python 3.12+)
+    logger.info("Creating virtual environment at %s (python3.12)", venv)
     check_call(['uv', 'venv', venv, '--python', 'python3.12'])
 
     # Run deploy script inside the venv
+    logger.info("Running run_deploy.py inside the venv (%s)", python)
     check_call([python, os.path.join(this_dir, 'deploy', 'run_deploy.py')] +
                (['--gpu'] if args.gpu else []) +
                (['--gpu-legacy'] if args.gpu_legacy else []) +
                (['--dbdir', args.dbdir] if args.dbdir else []))
+    logger.info("Deploy finished successfully")
 
 
 if __name__ == "__main__":
