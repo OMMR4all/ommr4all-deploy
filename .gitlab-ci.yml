@@ -75,7 +75,10 @@ production-deploy:
     - deployment-production
   script:
     - set -e
-    - python3 ommr4all-deploy/deploy.py --gpu
+    # --gpu-legacy pins a Pascal-compatible torch (sm_61, e.g. GTX 10xx); the
+    # production host's GPU is a GTX 10xx, and plain --gpu (newest CUDA torch,
+    # sm_61 dropped in torch 2.8) would not run on it.
+    - python3 ommr4all-deploy/deploy.py --gpu-legacy
 
 production-cleanup:
   only:
