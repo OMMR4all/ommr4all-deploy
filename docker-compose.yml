@@ -1,3 +1,25 @@
+# OMMR4all — all configuration comes from the .env file next to this file
+# (see .env.example). Every variable below has a default, so `docker compose up`
+# works even without a .env; `./start.sh` creates one from .env.example for you.
+#
+# Container-side paths (do not change): the host directories are chosen in .env
+#   STORAGE  ->  /opt/ommr4all/storage    book/page data
+#   DB_DIR   ->  /opt/ommr4all/db         SQLite database (defaults to STORAGE)
+
+# Shared by the web (WSGI) and ws (ASGI) services — both are the same Django app
+# and must agree on storage/database location and channel layer.
+x-ommr4all-env: &ommr4all-env
+  OMMR4ALL_STORAGE_ROOT: /opt/ommr4all/storage
+  OMMR4ALL_DB_PATH: /opt/ommr4all/db/${DB_NAME:-db.sqlite3}
+  # channel layer shared between the services so HTTP-triggered events reach websockets
+  REDIS_URL: redis://redis:6379/0
+
+x-ommr4all-volumes: &ommr4all-volumes
+  - ${STORAGE:-./storage}:/opt/ommr4all/storage
+  # When DB_DIR is unset this is the same host directory as the storage mount,
+  # i.e. the database lives at <STORAGE>/db.sqlite3 (the historical location).
+  - ${DB_DIR:-${STORAGE:-./storage}}:/opt/ommr4all/db
+
 services:
   web:
     image: uniwue/ommr4all
@@ -9,23 +31,23 @@ services:
         GPU_MODE: ${GPU_MODE:-}
     restart: unless-stopped
     ports:
-      - "${PORT}:8001"
-    volumes:
-      - ${STORAGE}:/opt/ommr4all/storage
+      - "${PORT:-8001}:8001"
+    volumes: *ommr4all-volumes
     environment:
+      <<: *ommr4all-env
       # optional superuser auto-creation on first start (see .env.example)
-      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-}
-      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-}
-      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-}
+      DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-}
+      DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-}
+      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-}
+      # set to 0 to skip the recursive storage permission fix on start
+      FIX_STORAGE_PERMISSIONS: ${FIX_STORAGE_PERMISSIONS:-1}
       # optional LLM providers for the text_llm transcription step;
       # leave empty to offer only the local Chandra model in the client
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_MODEL=${GEMINI_MODEL:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - OPENAI_API_URL=${OPENAI_API_URL:-}
-      - OPENAI_MODEL=${OPENAI_MODEL:-}
-      # channel layer shared with the ws service so HTTP-triggered events reach websockets
-      - REDIS_URL=redis://redis:6379/0
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_URL: ${OPENAI_API_URL:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
     depends_on:
       - redis
     healthcheck:
@@ -47,10 +69,9 @@ services:
     working_dir: /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server
     command: /opt/ommr4all/ommr4all-deploy-venv/bin/daphne -b 0.0.0.0 -p 8002 --proxy-headers ommr4all.routing:application
     environment:
-      - DJANGO_SETTINGS_MODULE=ommr4all.settings
-      - REDIS_URL=redis://redis:6379/0
-    volumes:
-      - ${STORAGE}:/opt/ommr4all/storage
+      <<: *ommr4all-env
+      DJANGO_SETTINGS_MODULE: ommr4all.settings
+    volumes: *ommr4all-volumes
     depends_on:
       redis:
         condition: service_started

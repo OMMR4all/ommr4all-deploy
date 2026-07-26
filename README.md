@@ -7,21 +7,36 @@ Deployment/Setup of all OMMR4all services.
 Requires [Docker](https://www.docker.com/) with the Compose plugin (or the
 standalone `docker-compose` binary).
 
-### Initial setup
+### Start
 
-1. Copy the example configuration and adjust it:
-   ```shell
-   cp .env.example .env
-   # edit .env: PORT, STORAGE, optional DJANGO_SUPERUSER_* and LLM API keys
-   ```
-2. (Optional) Select submodule branches in `.env` and check them out:
-   ```shell
-   ./setup_branches.sh
-   ```
-3. Build and start:
-   ```shell
-   ./start.sh            # add --gpu for NVIDIA GPU passthrough, --no-cache for a full rebuild
-   ```
+```shell
+./start.sh            # add --gpu for NVIDIA GPU passthrough, --no-cache for a full rebuild
+```
+
+That is the whole setup. On the first run `start.sh` creates `.env` from
+`.env.example`, creates the storage/database directories, builds the image and
+starts the services. The app is then served at `http://localhost:8001`.
+
+### Configuration
+
+All settings live in the `.env` file next to `docker-compose.yml`. Edit it and
+re-run `./start.sh` to apply. The most relevant ones:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PORT` | `8001` | Host port the app is served on |
+| `STORAGE` | `./storage` | **Host** directory holding all book/page data |
+| `DB_DIR` | *(= `STORAGE`)* | Host directory for the SQLite database — set it only if you want the database somewhere other than the storage directory |
+| `DB_NAME` | `db.sqlite3` | Filename of the database in that directory |
+| `DJANGO_SUPERUSER_USERNAME` / `_EMAIL` / `_PASSWORD` | *(empty)* | Auto-create the first admin user on first start |
+| `GEMINI_API_KEY`, `OPENAI_API_KEY`, … | *(empty)* | Optional LLM providers for the `text_llm` step |
+
+Both directories are bind-mounted into the container, so data and database
+survive rebuilds. By default the database is `<STORAGE>/db.sqlite3`, i.e. data
+and database stay together and can be moved as one directory.
+
+Optionally select submodule branches in `.env` and check them out with
+`./setup_branches.sh` before starting.
 
 The image is built from your **local checkout** (including the submodule
 branches you have checked out). On container start the entrypoint backs up the

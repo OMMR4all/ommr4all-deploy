@@ -10,13 +10,23 @@ set -euo pipefail
 
 PYTHON=/opt/ommr4all/ommr4all-deploy-venv/bin/python
 MANAGE=/opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/manage.py
-STORAGE=/opt/ommr4all/storage
-DB="$STORAGE/db.sqlite3"
 
-mkdir -p "$STORAGE"
+# Both paths are container-side and configurable from the .env file (see
+# docker-compose.yml). settings.py reads the same two variables, so whatever is
+# set here is exactly what Django uses. The DB defaults into the storage mount
+# so a plain `docker run` with only the storage volume still persists it.
+STORAGE="${OMMR4ALL_STORAGE_ROOT:-/opt/ommr4all/storage}"
+DB="${OMMR4ALL_DB_PATH:-$STORAGE/db.sqlite3}"
+export OMMR4ALL_STORAGE_ROOT="$STORAGE"
+export OMMR4ALL_DB_PATH="$DB"
+
+echo "==> Storage:  $STORAGE"
+echo "==> Database: $DB"
+
+mkdir -p "$STORAGE" "$(dirname "$DB")"
 
 if [[ -f "$DB" ]]; then
-    echo "==> Backing up database to db.sqlite3.backup..."
+    echo "==> Backing up database to $DB.backup..."
     cp "$DB" "$DB.backup"
 fi
 
@@ -34,7 +44,20 @@ if ! "$PYTHON" "$MANAGE" migrate --noinput; then
 fi
 
 chmod 666 "$DB"
-chmod o+w "$STORAGE"
+# SQLite needs write access to the *directory* too (-journal / -wal side files)
+chmod o+w "$STORAGE" "$(dirname "$DB")"
+
+# Apache runs as www-data, but the storage tree is usually owned by whoever
+# created the books on the host (often root). Grant "other" read+write across the
+# tree so the workers can read book_meta.json and write page data back. 'X' adds
+# +x to directories only, never to regular files. Cheap (metadata only) and
+# self-healing after books are added from outside the container.
+# Set FIX_STORAGE_PERMISSIONS=0 in .env to skip, e.g. for slow network storage.
+if [[ "${FIX_STORAGE_PERMISSIONS:-1}" != "0" ]]; then
+    echo "==> Making storage accessible to the Apache workers (www-data)..."
+    chmod -R o+rwX "$STORAGE" \
+        || echo "!! Could not fix all storage permissions; some books may be unreadable" >&2
+fi
 
 # Auto-create superuser when DJANGO_SUPERUSER_USERNAME is set and no superuser exists yet.
 if [[ -n "${DJANGO_SUPERUSER_USERNAME:-}" ]]; then

@@ -11,6 +11,10 @@ __pycache__
 *.swp
 storage
 modules/ommr4all-server/storage
+# dev database — the container gets its own via the DB_DIR mount; copying this
+# in would bake user data into the image (and it is never read at runtime)
+modules/ommr4all-server/db.sqlite3
+**/db.sqlite3
 modules/ommr4all-client/node_modules
 modules/ommr4all-client/dist
 test-server-venv

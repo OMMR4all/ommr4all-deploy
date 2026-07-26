@@ -102,16 +102,19 @@ Three environments map to three deployment paths:
 ## Docker
 
 ```bash
-# Configure, then build and start
-cp .env.example .env      # edit PORT, STORAGE, DJANGO_SUPERUSER_*, LLM keys
+# Build and start (creates .env from .env.example on first run)
 ./start.sh                # --gpu for GPU passthrough, --no-cache for full rebuild, --stop to stop
+
+# Configuration lives in .env: PORT, STORAGE, DB_DIR, DB_NAME, DJANGO_SUPERUSER_*, LLM keys
 
 # Create superuser manually (automatic on first start when DJANGO_SUPERUSER_* is set in .env)
 docker compose exec web /opt/ommr4all/ommr4all-deploy-venv/bin/python \
   /opt/ommr4all/ommr4all-deploy/modules/ommr4all-server/manage.py createsuperuser
 ```
 
-The image is `uniwue/ommr4all`, built from the **local checkout** (heavy paths excluded via `.dockerignore`), exposes port 8001, mounts storage at `${STORAGE}:/opt/ommr4all/storage`, and serves via Apache2 + mod_wsgi. The container entrypoint (`ommr4all-deploy/docker/entrypoint.sh`) backs up the SQLite DB, runs migrations, and creates the superuser before starting Apache.
+The image is `uniwue/ommr4all`, built from the **local checkout** (heavy paths excluded via `.dockerignore`), exposes port 8001, mounts storage at `${STORAGE}:/opt/ommr4all/storage` and the database directory at `${DB_DIR:-${STORAGE}}:/opt/ommr4all/db`, and serves via Apache2 + mod_wsgi. The container entrypoint (`ommr4all-deploy/docker/entrypoint.sh`) backs up the SQLite DB, runs migrations, and creates the superuser before starting Apache.
+
+Storage and database locations are resolved from two env vars read by `settings.py` (`OMMR4ALL_STORAGE_ROOT`, `OMMR4ALL_DB_PATH`) and set by compose from `.env`. `run_deploy.py` only rewrites the *defaults* of those `os.environ.get(...)` calls, so bare-metal deploys keep the baked-in paths while Docker overrides them at runtime.
 
 ## Key Architecture Notes
 

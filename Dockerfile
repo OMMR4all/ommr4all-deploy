@@ -33,14 +33,29 @@ ENV LANG=en_US.UTF-8
 WORKDIR /opt/ommr4all
 COPY . /opt/ommr4all/ommr4all-deploy-src
 
-# Setup Apache (proxy modules forward /ws to the daphne ASGI service)
+# Setup Apache (proxy modules forward /ws to the daphne ASGI service).
+# The two sed calls point Apache's vhost and global logs at stdout/stderr so that
+# `docker compose logs web` shows Django tracebacks instead of them disappearing
+# into a file inside the container. apache2.conf keeps its file targets for bare metal.
 RUN cp /opt/ommr4all/ommr4all-deploy-src/ommr4all-deploy/deploy/apache2.conf \
     /etc/apache2/sites-available/ommr4all.conf \
+    && sed -i -e 's#ErrorLog .*#ErrorLog /dev/stderr#' \
+              -e 's#CustomLog .*#CustomLog /dev/stdout combined#' \
+        /etc/apache2/sites-available/ommr4all.conf \
+    && sed -i 's#^ErrorLog .*#ErrorLog /dev/stderr#' /etc/apache2/apache2.conf \
     && a2enmod proxy proxy_http proxy_wstunnel \
     && a2ensite ommr4all.conf \
     && apachectl configtest
 
+# Storage/database location inside the container. Both are read by settings.py
+# and the entrypoint, and are overridden at runtime from the .env file (see
+# docker-compose.yml). OMMR4ALL_DB_PATH is intentionally left unset here so that
+# it defaults into the storage volume — a plain `docker run -v ...:/opt/ommr4all/storage`
+# then still persists the database.
+ENV OMMR4ALL_STORAGE_ROOT=/opt/ommr4all/storage
+
 # Run deploy script.
+# --dbdir only sets the *baked-in default* db path; a runtime OMMR4ALL_DB_PATH wins.
 # GPU_MODE=legacy bakes a Pascal-compatible torch (sm_61, e.g. GTX 10xx) into the
 # image; otherwise the default CPU/PyPI torch is installed (start.sh sets this).
 ARG GPU_MODE=

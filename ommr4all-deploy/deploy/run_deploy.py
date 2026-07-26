@@ -173,6 +173,8 @@ def main():
 
     settings = settings.replace('ALLOWED_HOSTS = []', 'ALLOWED_HOSTS = ["*"]')
     settings = settings.replace('DEBUG = True', 'DEBUG = False')
+    # settings.py reads the db path as os.environ.get('OMMR4ALL_DB_PATH', <default>);
+    # this only rewrites the *default*, so a runtime OMMR4ALL_DB_PATH (Docker) still wins.
     settings = settings.replace("os.path.join(BASE_DIR, 'db.sqlite3')", "'{}'".format(db_file))
     settings = settings.replace("BASE_DIR, 'storage'", "'{}'".format(storage_dir))
     settings = re.sub(r"SECRET_KEY = .*", "SECRET_KEY = '{}'".format(random_secret_key), settings)
