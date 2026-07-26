@@ -47,7 +47,7 @@ master-deploy:
     - set -e
     # --skip-storage-backup: storage is backed up separately; skip the in-deploy
     # copy so large storage trees don't slow the deploy or risk filling the disk.
-    - python3 ommr4all-deploy/deploy.py --skip-storage-backup
+    - python3 ommr4all-deploy/deploy.py --skip-storage-backup --skip-permission-fix
 
 master-cleanup:
   only:
@@ -82,7 +82,7 @@ production-deploy:
     # sm_61 dropped in torch 2.8) would not run on it.
     # --skip-storage-backup: storage is backed up separately; skip the in-deploy
     # copy so large storage trees don't slow the deploy or risk filling the disk.
-    - python3 ommr4all-deploy/deploy.py --gpu-legacy --skip-storage-backup
+    - python3 ommr4all-deploy/deploy.py --gpu-legacy --skip-storage-backup --skip-permission-fix
 
 production-cleanup:
   only:

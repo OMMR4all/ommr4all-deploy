@@ -56,6 +56,12 @@ def main():
                         help="Skip backing up the storage tree before migrating (forwarded to "
                              "run_deploy.py). Use when storage is large and backed up elsewhere.")
     parser.add_argument("--dbdir")
+    parser.add_argument('--web-user', dest='web_user', default='www-data',
+                        help="User the Apache workers run as; storage and the database are "
+                             "handed to it after deploying (default: www-data).")
+    parser.add_argument('--skip-permission-fix', dest='skip_permission_fix', action='store_true',
+                        help="Do not chown storage/database to --web-user (forwarded to "
+                             "run_deploy.py).")
 
     args = parser.parse_args()
 
@@ -92,6 +98,8 @@ def main():
                (['--gpu'] if args.gpu else []) +
                (['--gpu-legacy'] if args.gpu_legacy else []) +
                (['--skip-storage-backup'] if args.skip_storage_backup else []) +
+               (['--skip-permission-fix'] if args.skip_permission_fix else []) +
+               (['--web-user', args.web_user] if args.web_user else []) +
                (['--dbdir', args.dbdir] if args.dbdir else []))
     logger.info("Deploy finished successfully")
 

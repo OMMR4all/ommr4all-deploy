@@ -41,6 +41,65 @@ def dir_size(path):
     return total
 
 
+def fix_web_permissions(web_user, db_file):
+    """Hand storage and the database to the Apache worker user.
+
+    This script runs as the deploying user (usually root via the CI runner), so
+    everything it creates — the storage tree, the migrated database — is owned by
+    that user, while Apache serves as `web_user`. Without this the first write
+    (book upload, page save, login session) dies with PermissionError, and books
+    whose meta was saved with a restrictive umask become unreadable, which 500s
+    the whole book list. The Docker entrypoint does the equivalent.
+    """
+    import pwd
+    try:
+        if pwd.getpwnam(web_user).pw_uid == os.geteuid():
+            # deploying user *is* the user serving the site (e.g. a gitlab-runner
+            # that also hosts Apache) — it already owns everything it just wrote
+            logger.info("Deploy runs as the Apache user %r; nothing to hand over", web_user)
+            return
+    except KeyError:
+        logger.warning("Apache worker user %r does not exist; skipping permission fix. "
+                       "Make sure the user serving the site can read and write %s and %s.",
+                       web_user, storage_dir, db_file)
+        return
+
+    # trailing colon = the user's login group, which is not always named after the
+    # user (e.g. nobody's group is nogroup); '{user}:{user}' would fail on those.
+    owner = '{}:'.format(web_user)
+    logger.info("Giving %s ownership of the storage tree %s", web_user, storage_dir)
+    try:
+        check_call(['chown', '-R', owner, storage_dir])
+    except Exception:
+        logger.exception("Could not chown %s to %s. The site will fail on the first "
+                         "write; fix it manually with: chown -R %s %s",
+                         storage_dir, web_user, owner, storage_dir)
+        return
+
+    if not os.path.exists(db_file):
+        return
+    db_dir = os.path.dirname(db_file)
+    try:
+        check_call(['chown', owner, db_file])
+    except Exception:
+        logger.exception("Could not chown the database %s to %s", db_file, web_user)
+        return
+    # SQLite writes -journal/-wal files next to the database, so the *directory*
+    # must be writable too. When the db lives inside storage the chown above
+    # already covered it; otherwise only widen that one directory — db_dir is
+    # often the install root (/opt/ommr4all) and must not be handed over wholesale.
+    if os.path.commonpath([os.path.abspath(db_dir),
+                           os.path.abspath(storage_dir)]) != os.path.abspath(storage_dir):
+        logger.warning("Database %s lives outside the storage tree; granting %s write "
+                       "access to %s so SQLite can create its journal files. Consider "
+                       "deploying with --dbdir %s to keep data and database together.",
+                       db_file, web_user, db_dir, storage_dir)
+        try:
+            os.chmod(db_dir, os.stat(db_dir).st_mode | 0o002)
+        except OSError:
+            logger.exception("Could not make %s writable for %s", db_dir, web_user)
+
+
 def guard_disk_space(path):
     """Abort *before* Apache is stopped if the disk can't hold the storage backup.
 
@@ -74,6 +133,13 @@ def main():
                              "(and the disk-space guard for it). Use when storage is large and "
                              "backed up elsewhere; note you lose the automatic storage rollback "
                              "if the deploy fails.")
+    parser.add_argument("--web-user", dest='web_user', default='www-data',
+                        help="User the Apache workers run as; storage and the database are "
+                             "handed to it after deploying (default: www-data).")
+    parser.add_argument("--skip-permission-fix", dest='skip_permission_fix', action='store_true',
+                        help="Do not chown storage/database to --web-user. Use when permissions "
+                             "are managed externally (ACLs, a shared group, or a non-standard "
+                             "Apache user).")
     args = parser.parse_args()
 
     db_file = os.path.join(args.dbdir, db_file_name)
@@ -261,6 +327,20 @@ def main():
             logger.exception("Failed to copy new version %s -> %s", root_dir, deploy_target)
             raise
         logger.info("New version copied into place")
+
+        # After migrating and copying, hand the data over to the Apache user.
+        # Inside the try block so a failure here still restarts Apache below.
+        if args.skip_permission_fix:
+            logger.warning("Skipping permission fix (--skip-permission-fix); ensure %r can "
+                           "read and write the storage tree and database itself", args.web_user)
+        else:
+            try:
+                fix_web_permissions(args.web_user, db_file)
+            except Exception:
+                # never fail an otherwise successful deploy over permissions —
+                # the code and database are already in place at this point
+                logger.exception("Permission fix failed; the deployed site may not be able "
+                                 "to write. Check ownership of %s and %s.", storage_dir, db_file)
     finally:
         # Always bring Apache back up, even if the migration or copy failed.
         apache('start')
