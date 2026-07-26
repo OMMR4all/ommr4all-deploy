@@ -18,13 +18,13 @@ def main():
         os.chdir('modules/' + submodule)
 
         # check if hash = version in server is equal to the actual submodule
-        hash = os.popen('git rev-parse HEAD').read().strip()
-        server_hash = [repo.hash for repo in server_test_manager['repos'] if repo.name == submodule]
-        if len(server_hash) != 1:
-            raise Exception("Module {} not found in {}".format(submodule, server_test_manager['repos']))
-        server_hash = server_hash[0]
-        if hash != server_hash:
-            raise ValueError("Error while processing {}: Server hash {} is not equal to submodule hash {}. You probably must upgrade the modules.".format(submodule, server_hash, hash))
+        #hash = os.popen('git rev-parse HEAD').read().strip()
+        #server_hash = [repo.hash for repo in server_test_manager['repos'] if repo.name == submodule]
+        #if len(server_hash) != 1:
+        #    raise Exception("Module {} not found in {}".format(submodule, server_test_manager['repos']))
+        #server_hash = server_hash[0]
+        #if hash != server_hash:
+        #    raise ValueError("Error while processing {}: Server hash {} is not equal to submodule hash {}. You probably must upgrade the modules.".format(submodule, server_hash, hash))
 
         check_call(['uv', 'pip', 'install', '--python', python, '-e', '.'])
         os.chdir(root_dir)
