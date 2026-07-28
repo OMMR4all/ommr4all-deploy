@@ -23,6 +23,8 @@ storage_dir = os.path.join(ommr4all_dir, 'storage')
 db_file_name = 'db.sqlite3'  # must match the filename in ommr4all/settings.py
 secret_key = os.path.join(ommr4all_dir, '.secret_key')
 python = sys.executable
+# this script runs inside the venv deploy.py created, i.e. <venv>/bin/python
+venv_dir = os.path.dirname(os.path.dirname(python))
 
 DISK_MARGIN_BYTES = 1 * 1024 ** 3  # headroom required beyond the storage backup copy
 
@@ -183,36 +185,26 @@ def main():
 
     logger.info("Setting up virtual environment and dependencies")
     os.chdir(root_dir)
-    # Extra args threaded into the requirements + editable installs below. For the
-    # legacy (Pascal) GPU build we add a constraints file so a transitive floor can't
-    # silently upgrade torch past the pinned, sm_61-compatible version.
-    constrain = []
+
+    # The torch build is chosen by a uv extra, all three variants locked in uv.lock
+    # (see the [project.optional-dependencies] block in the root pyproject.toml):
+    #   no extra -> torch from PyPI, already CUDA-enabled; what Docker uses
+    #   cuda     -> newest cu126 build, for hosts whose driver predates CUDA 13
+    #   pascal   -> torch 2.7.1+cu126, the last release with Pascal (sm_61) kernels
+    extra, label = None, 'default (PyPI, CUDA-enabled) torch'
     if args.gpu_legacy:
-        # PyTorch dropped Pascal (sm_61, e.g. GTX 10xx) in 2.8; 2.7.1+cu126 is the
-        # newest build that still ships those kernels. Pin it, then constrain the
-        # later installs so nothing bumps it back to an unsupported release.
-        logger.info("Installing Pascal-compatible torch 2.7.1+cu126 (sm_61, e.g. GTX 10xx)")
-        check_call(['uv', 'pip', 'install', '--python', python,
-                    'torch==2.7.1', 'torchvision==0.22.1',
-                    '--index-url', 'https://download.pytorch.org/whl/cu126'])
-        constraints_file = os.path.join(root_dir, '.torch-pascal-constraints.txt')
-        with open(constraints_file, 'w') as f:
-            f.write('torch==2.7.1\ntorchvision==0.22.1\n')
-        constrain = ['-c', constraints_file]
+        extra, label = 'pascal', 'Pascal-compatible torch 2.7.1+cu126 (sm_61, e.g. GTX 10xx)'
     elif args.gpu:
-        # Install CUDA (cu121) torch/torchvision first; requirements.txt pins them
-        # unpinned, so the install below sees them satisfied and keeps the GPU build.
-        logger.info("Installing CUDA (cu121) torch/torchvision for --gpu")
-        check_call(['uv', 'pip', 'install', '--python', python,
-                    'torch', 'torchvision',
-                    '--index-url', 'https://download.pytorch.org/whl/cu121'])
-    logger.info("Installing server requirements (modules/ommr4all-server/requirements.txt)")
-    check_call(['uv', 'pip', 'install', '--python', python] + constrain +
-               ['-r', 'modules/ommr4all-server/requirements.txt'])
-    for submodule in ['ommr4all-line-detection', 'ommr4all-layout-analysis']:
-        logger.info("Installing editable submodule: %s", submodule)
-        check_call(['uv', 'pip', 'install', '--python', python] + constrain +
-                   ['-e', os.path.join('modules', submodule)])
+        extra, label = 'cuda', 'CUDA (cu126) torch/torchvision'
+
+    # uv sync installs exactly what uv.lock pins, including the workspace members
+    # (ommr4all-server, -line-detection, -layout-analysis) as editable — replacing
+    # both the requirements.txt install and the per-submodule editable installs.
+    # --locked fails on a stale lock instead of silently resolving something else;
+    # run `uv lock` and commit the result after changing any pyproject.toml.
+    sync = ['uv', 'sync', '--locked'] + (['--extra', extra] if extra else [])
+    logger.info("Installing locked dependencies with %s", label)
+    check_call(sync, env=dict(os.environ, UV_PROJECT_ENVIRONMENT=venv_dir))
     logger.info("Dependency installation complete")
 
     os.chdir(root_dir)

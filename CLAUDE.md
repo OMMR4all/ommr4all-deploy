@@ -28,10 +28,11 @@ Deployment logic lives in `ommr4all-deploy/`:
 ```bash
 cd modules/ommr4all-server
 
-# Install dependencies (use uv from root, or pip inside the server module)
+# Install dependencies
 uv sync                          # from repo root — installs all workspace packages
-# or legacy:
-pip install -r requirements.txt
+# `modules/ommr4all-server/requirements.txt` is legacy and no longer used by the
+# deploy/test scripts (they run `uv sync --locked`); pyproject.toml + uv.lock are
+# the source of truth. Re-run `uv lock` and commit it after changing any pyproject.
 
 # Apply migrations
 python manage.py migrate
@@ -121,7 +122,15 @@ Storage and database locations are resolved from two env vars read by `settings.
 - **Django settings** are dynamically rewritten during deployment (`run_deploy.py` patches `ALLOWED_HOSTS`, `DEBUG`, `SECRET_KEY`, and the database path via sed).
 - **Static files** are collected by `manage.py collectstatic` during deploy and served by Apache under an alias; in dev they are served by Django or the Angular dev server.
 - **WebSocket support** is provided by Django Channels; routing is in `modules/ommr4all-server/ommr4all/routing.py`. In the Docker setup a separate `ws` service runs daphne (ASGI) with a Redis channel layer and Apache proxies `/ws` to it via `mod_proxy_wstunnel`; the dev server uses the in-memory channel layer.
-- **Package manager**: The workspace uses `uv` (see `pyproject.toml` and `uv.lock`). The deploy scripts create uv-based virtualenvs targeting Python 3.12 (`deploy.py` at `/opt/ommr4all/ommr4all-deploy-venv`).
+- **Package manager**: The workspace uses `uv` (see `pyproject.toml` and `uv.lock`). The deploy scripts create uv-based virtualenvs targeting Python 3.12 (`deploy.py` at `/opt/ommr4all/ommr4all-deploy-venv`) and populate them with `uv sync --locked` via `UV_PROJECT_ENVIRONMENT`, which also installs the three workspace members as editable. `--locked` fails on a stale lock, so run `uv lock` and commit after touching any `pyproject.toml`. The torch build is selected by a uv extra, and all three variants are locked in `uv.lock`:
+
+| Deploy flag | uv extra | torch |
+|---|---|---|
+| *(none)* | — | PyPI wheel, already CUDA-enabled (`2.11.0+cu130`) — what Docker uses |
+| `--gpu` | `cuda` | newest cu126 build (`2.13.0+cu126`), for drivers predating CUDA 13 |
+| `--gpu-legacy` | `pascal` | `2.7.1+cu126`, last release with Pascal (sm_61) kernels |
+
+The workspace floor is `torch>=2.7.1` precisely so the Pascal pin can resolve; the `cuda` extra carries its own `>=2.11` floor so it doesn't collapse onto the Pascal version. The cu121 index is **not** usable — upstream stopped publishing it at torch 2.5.1.
 - **Submodule hashes** are validated during test runs by `tests/manage_gitlab-ci.py` — if submodules are updated, that file must be updated accordingly.
 - **Multi-locale build**: The Angular client ships two variants (English default + German `production-de`); `ng build --configuration production` for English, `ng build --configuration production-de` for German.
 

@@ -9,6 +9,23 @@ dependencies = [
     "ommr4all-layout-analysis",
 ]
 
+# Optional CUDA torch builds, selected by the deploy scripts:
+#   uv sync                 -> PyPI wheel from uv.lock, already CUDA-enabled.
+#                              What the Docker image and most GPUs should use.
+#   uv sync --extra cuda    -> deploy.py --gpu, for drivers predating CUDA 13
+#   uv sync --extra pascal  -> deploy.py --gpu-legacy
+# Both extras use the cu126 index; cu121 was retired upstream at torch 2.5.1.
+[project.optional-dependencies]
+# floor kept above the pascal pin, otherwise this resolves to the pascal version
+cuda = ["torch>=2.11", "torchvision>=0.26"]
+# PyTorch dropped Pascal (sm_61, e.g. GTX 10xx) in 2.8; 2.7.1 is the last release
+# shipping those kernels — which is why the workspace floor is torch>=2.7.1.
+pascal = ["torch==2.7.1", "torchvision==0.22.1"]
+
+[tool.uv]
+# mutually exclusive, so uv locks a separate resolution for each
+conflicts = [[{ extra = "cuda" }, { extra = "pascal" }]]
+
 [tool.uv.workspace]
 members = ["modules/*"]
 exclude = [
@@ -18,7 +35,22 @@ exclude = [
     "modules/ommr4all-page-segmentation",
 
 ]
+
+# explicit = true: only packages that name this index below are taken from it
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
 [tool.uv.sources]
+torch = [
+    { index = "pytorch-cu126", extra = "cuda" },
+    { index = "pytorch-cu126", extra = "pascal" },
+]
+torchvision = [
+    { index = "pytorch-cu126", extra = "cuda" },
+    { index = "pytorch-cu126", extra = "pascal" },
+]
 ommr4all-server = { workspace = true }
 ommr4all-line-detection = { workspace = true }
 ommr4all-layout-analysis = { workspace = true }
