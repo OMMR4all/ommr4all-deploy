@@ -203,8 +203,18 @@ def main():
     # --locked fails on a stale lock instead of silently resolving something else;
     # run `uv lock` and commit the result after changing any pyproject.toml.
     sync = ['uv', 'sync', '--locked'] + (['--extra', extra] if extra else [])
+
+    def uv_sync(cwd):
+        """Point the venv at the workspace checked out in `cwd`.
+
+        An editable install writes the *absolute* source path into the venv
+        (site-packages/__editable___<pkg>_finder.py), so the venv is bound to
+        whichever directory this ran in — see the second call below.
+        """
+        check_call(sync, cwd=cwd, env=dict(os.environ, UV_PROJECT_ENVIRONMENT=venv_dir))
+
     logger.info("Installing locked dependencies with %s", label)
-    check_call(sync, env=dict(os.environ, UV_PROJECT_ENVIRONMENT=venv_dir))
+    uv_sync(root_dir)
     logger.info("Dependency installation complete")
 
     os.chdir(root_dir)
@@ -319,6 +329,19 @@ def main():
             logger.exception("Failed to copy new version %s -> %s", root_dir, deploy_target)
             raise
         logger.info("New version copied into place")
+
+        # Re-bind the venv's editable installs from the build directory to the
+        # deployed one. Only ommr4all-server is reachable without them (Apache
+        # puts modules/ommr4all-server on sys.path via python-path in
+        # apache2.conf); linesegmentation and layoutanalysis are importable
+        # *solely* through the editable install, so while it still pointed at
+        # root_dir they either loaded the build directory's copy of the code or,
+        # once CI wiped that directory (the `rm -rf *` cleanup stage in
+        # .gitlab-ci.yml), failed with ModuleNotFoundError in the task workers.
+        # Everything is already installed and cached, so this is quick.
+        if os.path.abspath(deploy_target) != os.path.abspath(root_dir):
+            logger.info("Re-pointing editable installs at the deployed tree %s", deploy_target)
+            uv_sync(deploy_target)
 
         # After migrating and copying, hand the data over to the Apache user.
         # Inside the try block so a failure here still restarts Apache below.
