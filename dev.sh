@@ -23,7 +23,8 @@ else
     echo "Error: Could not find the virtual environment at $VENV_PATH"
     exit 1
 fi
-
+echo "Migratind db"
+python "$SERVER/manage.py" migrate
 echo "Starting Django dev server..."
 python "$SERVER/manage.py" runserver &
 SERVER_PID=$!
