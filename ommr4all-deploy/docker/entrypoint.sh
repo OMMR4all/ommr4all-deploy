@@ -27,7 +27,28 @@ mkdir -p "$STORAGE" "$(dirname "$DB")"
 
 if [[ -f "$DB" ]]; then
     echo "==> Backing up database to $DB.backup..."
-    cp "$DB" "$DB.backup"
+    # NOT a plain cp: the database runs in WAL mode (see database/apps.py), so
+    # committed transactions may still live in the -wal side file and copying only
+    # the main file would silently drop them. sqlite3's backup API pulls in the WAL.
+    if ! "$PYTHON" - "$DB" "$DB.backup" <<'PY'
+import sqlite3
+import sys
+
+src, dst = sys.argv[1], sys.argv[2]
+source = sqlite3.connect(src)
+try:
+    target = sqlite3.connect(dst)
+    try:
+        source.backup(target)
+    finally:
+        target.close()
+finally:
+    source.close()
+PY
+    then
+        echo "!! Could not back up the database. Aborting startup." >&2
+        exit 1
+    fi
 fi
 
 echo "==> Running database migrations..."
@@ -36,6 +57,9 @@ if ! "$PYTHON" "$MANAGE" migrate --noinput; then
     if [[ -f "$DB.backup" ]]; then
         echo "!! Restoring database from $DB.backup (pre-migration state)." >&2
         cp "$DB.backup" "$DB"
+        # the -wal/-shm of the half-migrated database describe the file we just
+        # replaced; leaving them behind would mix the two states
+        rm -f "$DB-wal" "$DB-shm"
     fi
     echo "!! Aborting startup so the database is not left half-migrated." >&2
     echo "!! The pre-migration backup is preserved at $DB.backup." >&2

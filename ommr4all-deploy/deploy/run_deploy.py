@@ -102,6 +102,27 @@ def fix_web_permissions(web_user, db_file):
             logger.exception("Could not make %s writable for %s", db_dir, web_user)
 
 
+def backup_sqlite(src, dst):
+    """Copy a SQLite database including anything still sitting in its WAL.
+
+    The server runs the database in WAL mode (see database/apps.py), so committed
+    transactions can live in the -wal side file; a plain copyfile of the main file
+    would silently drop them. sqlite3's backup API produces a consistent snapshot
+    of the whole database instead.
+    """
+    import sqlite3
+
+    source = sqlite3.connect(src)
+    try:
+        target = sqlite3.connect(dst)
+        try:
+            source.backup(target)
+        finally:
+            target.close()
+    finally:
+        source.close()
+
+
 def guard_disk_space(path):
     """Abort *before* Apache is stopped if the disk can't hold the storage backup.
 
@@ -297,7 +318,7 @@ def main():
         shutil.rmtree(db_backup, ignore_errors=True)
         if os.path.exists(db_file):
             logger.info("Backing up database %s -> %s", db_file, db_backup)
-            shutil.copyfile(db_file, db_backup)
+            backup_sqlite(db_file, db_backup)
         else:
             logger.debug("No existing database at %s to back up", db_file)
 
@@ -313,6 +334,11 @@ def main():
                          "deploy (previously deployed version left in place).")
             if os.path.exists(db_backup):
                 shutil.copyfile(db_backup, db_file)
+                # the -wal/-shm of the half-migrated database belong to the file we
+                # just replaced; leaving them behind would mix the two states
+                for side_file in (db_file + '-wal', db_file + '-shm'):
+                    if os.path.exists(side_file):
+                        os.remove(side_file)
             raise
 
         # copy new version (only after a successful migration)
