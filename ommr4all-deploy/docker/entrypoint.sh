@@ -68,6 +68,14 @@ if ! "$PYTHON" "$MANAGE" migrate --noinput; then
 fi
 
 chmod 666 "$DB"
+# In WAL mode the -wal/-shm side files need the same access as the database itself.
+# migrate above ran as root, so without this the www-data workers cannot map them and
+# every request fails with SQLite's generic "disk I/O error".
+for side_file in "$DB-wal" "$DB-shm"; do
+    if [[ -f "$side_file" ]]; then
+        chmod 666 "$side_file"
+    fi
+done
 # SQLite needs write access to the *directory* too (-journal / -wal side files)
 chmod o+w "$STORAGE" "$(dirname "$DB")"
 

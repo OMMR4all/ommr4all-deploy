@@ -82,7 +82,12 @@ def fix_web_permissions(web_user, db_file):
         return
     db_dir = os.path.dirname(db_file)
     try:
-        check_call(['chown', owner, db_file])
+        # in WAL mode the -wal/-shm side files carry the same access requirements as the
+        # database itself; a migrate run as root leaves them root-owned, and the workers
+        # then fail to map them with SQLite's generic "disk I/O error"
+        db_files = [db_file] + [f for f in (db_file + '-wal', db_file + '-shm')
+                                if os.path.exists(f)]
+        check_call(['chown', owner] + db_files)
     except Exception:
         logger.exception("Could not chown the database %s to %s", db_file, web_user)
         return
