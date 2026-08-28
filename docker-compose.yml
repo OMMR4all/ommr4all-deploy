@@ -13,6 +13,10 @@ x-ommr4all-env: &ommr4all-env
   OMMR4ALL_DB_PATH: /opt/ommr4all/db/${DB_NAME:-db.sqlite3}
   # channel layer shared between the services so HTTP-triggered events reach websockets
   REDIS_URL: redis://redis:6379/0
+  # reverse proxy / CSRF (see .env.example): needed so that form posts — above all the
+  # /admin/ login — are accepted when a TLS terminating proxy sits in front of the app
+  OMMR4ALL_TRUST_PROXY_HEADERS: ${OMMR4ALL_TRUST_PROXY_HEADERS:-1}
+  OMMR4ALL_CSRF_TRUSTED_ORIGINS: ${OMMR4ALL_CSRF_TRUSTED_ORIGINS:-}
 
 x-ommr4all-volumes: &ommr4all-volumes
   - ${STORAGE:-./storage}:/opt/ommr4all/storage

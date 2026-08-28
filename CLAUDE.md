@@ -106,7 +106,8 @@ Three environments map to three deployment paths:
 # Build and start (creates .env from .env.example on first run)
 ./start.sh                # --gpu for GPU passthrough, --no-cache for full rebuild, --stop to stop
 
-# Configuration lives in .env: PORT, STORAGE, DB_DIR, DB_NAME, DJANGO_SUPERUSER_*, LLM keys
+# Configuration lives in .env: PORT, STORAGE, DB_DIR, DB_NAME, DJANGO_SUPERUSER_*, LLM keys,
+# OMMR4ALL_TRUST_PROXY_HEADERS / OMMR4ALL_CSRF_TRUSTED_ORIGINS (see below)
 
 # Create superuser manually (automatic on first start when DJANGO_SUPERUSER_* is set in .env)
 docker compose exec web /opt/ommr4all/ommr4all-deploy-venv/bin/python \
@@ -116,6 +117,8 @@ docker compose exec web /opt/ommr4all/ommr4all-deploy-venv/bin/python \
 The image is `uniwue/ommr4all`, built from the **local checkout** (heavy paths excluded via `.dockerignore`), exposes port 8001, mounts storage at `${STORAGE}:/opt/ommr4all/storage` and the database directory at `${DB_DIR:-${STORAGE}}:/opt/ommr4all/db`, and serves via Apache2 + mod_wsgi. The container entrypoint (`ommr4all-deploy/docker/entrypoint.sh`) backs up the SQLite DB, runs migrations, and creates the superuser before starting Apache.
 
 Storage and database locations are resolved from two env vars read by `settings.py` (`OMMR4ALL_STORAGE_ROOT`, `OMMR4ALL_DB_PATH`) and set by compose from `.env`. `run_deploy.py` only rewrites the *defaults* of those `os.environ.get(...)` calls, so bare-metal deploys keep the baked-in paths while Docker overrides them at runtime.
+
+**Reverse proxy / CSRF**: the container speaks plain HTTP on 8001, so when a TLS-terminating proxy sits in front of it Django's origin check compares the browser's `Origin: https://host` against its own `http://host` and rejects every POST — the visible symptom is "CSRF verification failed" on the `/admin/` login. `settings.py` therefore sets `SECURE_PROXY_SSL_HEADER` + `USE_X_FORWARDED_HOST` unless `OMMR4ALL_TRUST_PROXY_HEADERS=0`, and accepts extra origins (scheme included, comma separated) via `OMMR4ALL_CSRF_TRUSTED_ORIGINS`. Django logs the concrete rejection reason to the `django.security.csrf` logger, i.e. into `docker compose logs web` (bare metal: `/var/log/apache2/ommr4all-error.log`). Bare-metal deploys have no `.env`: `settings.py` reads `os.environ` at import time, so Apache's `SetEnv` does not reach it — both variables go into `/etc/apache2/envvars` followed by a *restart*, the same route the README documents for `REDIS_URL`.
 
 ## Key Architecture Notes
 

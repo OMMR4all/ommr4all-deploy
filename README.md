@@ -137,6 +137,42 @@ owned by that user again. Re-running the deploy fixes them, or do it directly:
 sudo chown -R www-data: /opt/ommr4all/storage
 ```
 
+### Behind a TLS reverse proxy (CSRF)
+
+The shipped vhost is **plain HTTP** on port 8001. When TLS is terminated by something
+in front of it, the request reaches Django as `http://…` while the browser sends
+`Origin: https://…`. Django compares the two on every unsafe request, sees a mismatch
+and answers **"Forbidden (403) CSRF verification failed"**. The API is unaffected (it
+authenticates with a JWT bearer token, which is CSRF-exempt), so the symptom is
+usually just that the Django admin login stops working. The rejection reason is logged:
+
+```shell
+sudo grep -i csrf /var/log/apache2/ommr4all-error.log | tail
+# Forbidden (Origin checking failed - https://your.host does not match any trusted origins.)
+```
+
+`settings.py` trusts `X-Forwarded-Proto`/`X-Forwarded-Host` by default
+(`OMMR4ALL_TRUST_PROXY_HEADERS=0` disables it), which resolves this **if the proxy sends
+those headers**. Apache's `mod_proxy` does not add `X-Forwarded-Proto` on its own — if you
+own the fronting vhost, add it there:
+
+```apache
+ProxyPreserveHost On
+RequestHeader set X-Forwarded-Proto "https"
+```
+
+If the proxy is not yours to configure, name the public origin instead. Like `REDIS_URL`
+above this has to be in the *process* environment, i.e. `/etc/apache2/envvars`, followed by
+a restart (not a reload):
+
+```shell
+echo 'export OMMR4ALL_CSRF_TRUSTED_ORIGINS=https://your.host' | sudo tee -a /etc/apache2/envvars
+sudo systemctl restart apache2
+```
+
+Scheme included, no trailing slash; comma-separate several origins. `/etc/apache2/envvars`
+lives outside the checkout, so the setting survives redeploys.
+
 ### Websockets on bare metal (live document/chant updates)
 
 `deploy.py` sets up the WSGI (Apache + mod_wsgi) app but does **not** provision the
