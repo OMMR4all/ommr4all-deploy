@@ -134,6 +134,7 @@ Storage and database locations are resolved from two env vars read by `settings.
 | `--gpu-legacy` | `pascal` | `2.7.1+cu126`, last release with Pascal (sm_61) kernels |
 
 The workspace floor is `torch>=2.7.1` precisely so the Pascal pin can resolve; the `cuda` extra carries its own `>=2.11` floor so it doesn't collapse onto the Pascal version. The cu121 index is **not** usable — upstream stopped publishing it at torch 2.5.1.
+- **Third-party git dependencies are pinned by commit.** `pixel-classifier-torch` (`OMMR4all/segmentation-pytorch`) and `guppyocr` (`uniwue-ai-ks/guppyocr`) carry an explicit `rev = "<full sha>"` in `modules/ommr4all-server/pyproject.toml`; `libpagexml3`, which guppyocr requires straight from git, is pinned through `override-dependencies` in the root `[tool.uv]` because `tool.uv.sources` only applies to direct dependencies. All three live in public GitHub repos, so no credentials are needed. To bump one, edit its `rev` (or the override string) and run `uv lock`; `uv lock --upgrade` will not move a pinned rev.
 - **Submodule hashes** are validated during test runs by `tests/manage_gitlab-ci.py` — if submodules are updated, that file must be updated accordingly.
 - **Multi-locale build**: The Angular client ships two variants (English default + German `production-de`); `ng build --configuration production` for English, `ng build --configuration production-de` for German.
 

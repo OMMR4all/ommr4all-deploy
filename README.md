@@ -231,3 +231,43 @@ cd modules/ommr4all-client
 npm install
 npm start                                 # English; npm run start-de for German
 ```
+
+## Image-diverse page assignments
+
+In a book's **Page assignments** tab, a logged-in editor with READ_WRITE access can
+request a number of suggested pages for themselves. The **From page** and **To page**
+selectors default to the first and last page. Narrow them to skip covers, bindings,
+or other pages not worth correcting. The inclusive range follows book page order,
+not lexical page-label order; pages outside it are neither embedded nor selected.
+A background DINO task embeds the remaining original page images (up to 448 px per
+side), selects visually diverse, unassigned pages that are not finished, and creates
+one assignment atomically. Partly annotated pages remain eligible; finished and
+already-assigned pages *within the range* inform diversity but are never selected.
+Missing or unreadable images are skipped; if too few eligible pages remain, no
+assignment is created. This is an appearance heuristic, not a guarantee of better
+fine-tuning accuracy. The task requires a configured long CPU or GPU worker and a
+downloadable/cached DINO model. API callers can pass `fromPage` and `toPage` with
+`count` to `PUT /api/book/{book}/assignments/self`; omitting both keeps the full book.
+
+Book permission managers can instead choose several users and a page count **per user**
+in the same tab, then start **Suggested assignments for users**. The task embeds the
+range once and creates one assignment per selected user. Each user receives distinct,
+unassigned, unfinished pages; if the range lacks enough eligible images for *all*
+users, none of the assignments is created. The manager can leave the tab and return
+to see the running task. API callers use
+`PUT /api/book/{book}/assignments/suggested` with
+`{"usernames":["alice","bob"],"count":5,"fromPage":"001","toPage":"099"}`;
+`count` is per user. The task status is available at
+`GET /api/book/{book}/assignments/suggested/task/{task_id}` to its creator.
+
+For offline suggestions without a task or assignment, run from the server module:
+
+```shell
+uv run python -m omr.discovery.cli suggest-pages --book demo \
+  --page-method whole_image --count 10
+```
+
+The default `--page-method staff_foreground` retains staff-crop/PCGTS-based
+suggestions for symbol fine-tuning. Whole-image mode works for books with
+original images and no annotated music lines. Both modes exclude Symbols-locked
+pages by default offline; use `--corrected-pages` to override the reference set.

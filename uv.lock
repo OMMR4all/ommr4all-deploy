@@ -21,6 +21,7 @@ members = [
     "ommr4all-line-detection",
     "ommr4all-server",
 ]
+overrides = [{ name = "libpagexml3", git = "https://github.com/uniwue-ai-ks/libpagexml3.git?rev=97e528fa89a4b68da0129cef0b362432a9d8d21b" }]
 
 [[package]]
 name = "absl-py"
@@ -1041,7 +1042,7 @@ wheels = [
 [[package]]
 name = "guppyocr"
 version = "0.2.0"
-source = { git = "https://gitlab2.informatik.uni-wuerzburg.de/nof36hn/guppyocr.git#69a42f018655f9c5b32479f0879e9ba38dce4060" }
+source = { git = "https://github.com/uniwue-ai-ks/guppyocr.git?rev=72c8b4c1605ca9da7255b3100518851b7231f88f#72c8b4c1605ca9da7255b3100518851b7231f88f" }
 dependencies = [
     { name = "adabelief-pytorch" },
     { name = "albumentations" },
@@ -1363,7 +1364,7 @@ wheels = [
 [[package]]
 name = "libpagexml3"
 version = "0.0.5"
-source = { git = "https://gitlab2.informatik.uni-wuerzburg.de/nof36hn/libpagexml3.git#97e528fa89a4b68da0129cef0b362432a9d8d21b" }
+source = { git = "https://github.com/uniwue-ai-ks/libpagexml3.git?rev=97e528fa89a4b68da0129cef0b362432a9d8d21b#97e528fa89a4b68da0129cef0b362432a9d8d21b" }
 dependencies = [
     { name = "loguru" },
     { name = "numpy" },
@@ -2418,7 +2419,7 @@ requires-dist = [
     { name = "edlib", specifier = ">=1.3.9.post1" },
     { name = "ezodf", specifier = ">=0.3.2" },
     { name = "filelock", specifier = ">=3.16" },
-    { name = "guppyocr", git = "https://gitlab2.informatik.uni-wuerzburg.de/nof36hn/guppyocr.git" },
+    { name = "guppyocr", git = "https://github.com/uniwue-ai-ks/guppyocr.git?rev=72c8b4c1605ca9da7255b3100518851b7231f88f" },
     { name = "h5py", specifier = ">=3.16.0" },
     { name = "locked-dict", specifier = ">=2023.10.22" },
     { name = "loguru", specifier = ">=0.7.3" },
@@ -2433,7 +2434,7 @@ requires-dist = [
     { name = "pdf2image", specifier = ">=1.17.0" },
     { name = "peakutils", specifier = ">=1.3.5" },
     { name = "pillow", specifier = ">=12.1.1" },
-    { name = "pixel-classifier-torch", git = "https://github.com/Gawajn/segmentation-pytorch.git" },
+    { name = "pixel-classifier-torch", git = "https://github.com/OMMR4all/segmentation-pytorch.git?rev=042d94567e915f0ce5248985620912655131c1ea" },
     { name = "prettytable", specifier = ">=3.17.0" },
     { name = "protobuf", specifier = ">=7.34.1" },
     { name = "psutil", specifier = ">=5.9" },
@@ -2675,7 +2676,7 @@ wheels = [
 [[package]]
 name = "pixel-classifier-torch"
 version = "0.2.2.4"
-source = { git = "https://github.com/Gawajn/segmentation-pytorch.git#042d94567e915f0ce5248985620912655131c1ea" }
+source = { git = "https://github.com/OMMR4all/segmentation-pytorch.git?rev=042d94567e915f0ce5248985620912655131c1ea#042d94567e915f0ce5248985620912655131c1ea" }
 dependencies = [
     { name = "albumentations" },
     { name = "dataclasses-json" },
