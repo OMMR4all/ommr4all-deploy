@@ -34,6 +34,9 @@ services:
       args:
         GPU_MODE: ${GPU_MODE:-}
     restart: unless-stopped
+    # Docker's default /dev/shm is 64 MB; torch DataLoader workers hand every batch
+    # to the trainer through it (the end-to-end trainer falls back to 0 workers below 1 GB)
+    shm_size: 2gb
     ports:
       - "${PORT:-8001}:8001"
     volumes: *ommr4all-volumes

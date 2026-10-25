@@ -136,6 +136,17 @@ Storage and database locations are resolved from two env vars read by `settings.
 The workspace floor is `torch>=2.7.1` precisely so the Pascal pin can resolve; the `cuda` extra carries its own `>=2.11` floor so it doesn't collapse onto the Pascal version. The cu121 index is **not** usable — upstream stopped publishing it at torch 2.5.1.
 - **Submodule hashes** are validated during test runs by `tests/manage_gitlab-ci.py` — if submodules are updated, that file must be updated accordingly.
 - **Multi-locale build**: The Angular client ships two variants (English default + German `production-de`); `ng build --configuration production` for English, `ng build --configuration production-de` for German.
+- **End-to-end transcription** (`omr/steps/end2end/`, group `end2end`): one network reads a music block plus its lyric line and emits symbols, syllables and syllable→note assignments as one token sequence. Two architectures share trainer, predictor and codec: `end2end_swin` (Swin-Tiny, 224 px input, training op `train_end2end`) and `end2end_convnext` (ConvNeXt-Tiny truncated at stride 16 with 2D positional encoding, 320 px input via `convnext.meta.INPUT_HEIGHT` — models keep the height they were trained with — op `train_end2end_convnext`). On Pa_14819_gt with full training data ConvNeXt reaches ~94 % hSAR vs 68 % for Swin. The localisation loss weight is `trainer.LOC_LOSS_WEIGHT = 0.2`.
+  - *Codec* (`omr/end2end/codec/codec.py`): one token per symbol, e.g. `(note|0|6|2)`, `(clef|c|7)`. Symbols of a registered class (`SymbolClass`) get `(clef|@<class_id>|7)` / `(other|@<class_id>|5)`; the classes come from `DatasetParams.symbol_label_sets` (set by `taskrunnertrainer.py` for the symbols *and* end2end groups) and travel in the model's `dataset_params.json`. Built-in tokens are byte-identical to the legacy generator — never change their format.
+  - *Localisation*: a pointer head attends from the decoder state of each symbol token onto a stride-8 feature map; x comes from that, y from the predicted position in staff on the staff lines. The head and its soft-argmax always run in fp32 (under bf16 autocast x would be rounded to several pixels). Models without the head (`loc_head.*` missing in `model_best.pth`) still load and place symbols evenly.
+  - *Location feedback* (`trainer.LOC_FEEDBACK`, on by default): the position of the latest symbol is fed back into the decoder input (GT positions with jitter in training, predicted positions at inference). It is detected from `loc_feedback.*` in the checkpoint, so older models load unchanged. Experiment log: `docs/end2end-experiments.md`.
+  - *Lyrics*: all lyric lines in the row below a music block are candidates (`sample_builder.lyric_lines_for_music_block`): a chant starting mid-line splits the lyrics into two lines (two lyrics blocks from the layout step, or two lines of one block from the editor's splitter) while the music line stays whole. Each syllable goes to the line below its first note (`predictor.assign_chunks_to_lines`, never moving back left); a lyric line below two music blocks collects both. The crop still uses only the closest lyrics block, as in training.
+  - *Chant/strophe starts*: lyric lines carry `Line.start_type` (`LineStartType` none/chant/strophe; JSON `startType`). The GT target puts `[NEW_CHANT]` / `[NEW_STROPHE]` before the first syllable of a chant/strophe line (`data_generator.line_start_markers`). At prediction a marked syllable that begins a line sets that line's start type; a marked syllable just before the next lyric line (`predictor.START_TOLERANCE` music-block heights) joins it; mid-line it splits the lyric line only at a DROP_CAPITAL block in the gap (`plan_line_starts`; marker-only splits were all wrong on Pa). The page is only changed in `apply_text_lines` (`store_to_page`, experimenter output books); `textLines` on the wire carry `startType`, changed `coords`, and for new lines `blockId` + `splitFrom`, which the editor's End2End branch applies as one undoable action. Models trained before `[NEW_STROPHE]` existed never emit it.
+  - *Page prerequisites*: `AlgorithmPredictor.runnable(page)` (default true) lets a step skip pages without its input in batch runs (workflow, book operations; mirrored in the page-selection preview). End2end requires staff lines and a lyrics block.
+  - *Schedule*: no LR decay and no early stopping before epoch `trainer.FULL_LR_EPOCHS` (25). The validation loss plateaus before the localisation locks in; decaying inside that plateau cost up to 11 points hSAR.
+  - *Decoding*: beam search with `predictor.BEAM_SIZE = 4` (1 = greedy); each beam carries its own fed-back location. The experimenter also reports the lyrics CER (raw and orthography-normalised).
+  - *Fine-tuning* from any older model: the codec is the old one plus appended new tokens, embedding/head rows are copied by token string, a new class token starts from its base class's row (`omr/steps/end2end/model_io.py`).
+  - *Evaluation* (from `modules/ommr4all-server`): `PYTHONPATH=. python omr/experimenter/runner.py --type END2END_CONVNEXT --train <books> --test <books> --cross_folds 5 --single_folds 0 --ignore_gapped_symbols --early_stopping_max_keep 5 --n_epoch 100` reports detection P/R/F1, hSAR ("Sequence"), dSAR ("Sequence NC") and the localisation error in staff spaces next to the even-placement baseline (`omr/steps/end2end/experimenter.py`). With `--train` *and* `--test`, `--cross_folds` splits the train books into train/validation (5 → 80/20, fold 0); `--cross_folds 1` would leave no training data. Only pages with StaffLines, Layout, Symbols and Text locked are used (the trainer's `required_locks`).
 
 ---
 
@@ -184,7 +195,7 @@ Client model: `src/app/data-types/page/`
             "id": "<line-id>",
             "coords": "x1,y1 x2,y2 ...",       // height-normalised bounding polygon
             "reconstructed": false,
-            "documentStart": false,
+            "startType": "none",  // "none" | "chant" (opens a document) | "strophe" (new strophe, same document); legacy files: "documentStart": true → chant
             "staffLines": [
               {
                 "id": "<sl-id>",
@@ -196,13 +207,14 @@ Client model: `src/app/data-types/page/`
             "symbols": [
               {
                 "id": "<sym-id>",
-                "type": "note",   // "note" | "clef" | "accid"
+                "type": "note",   // "note" | "clef" | "accid" | "other" (bar lines etc., no sub type)
                 "coord": "x,y",   // height-normalised single point
                 "positionInStaff": 5,
                 "noteType": 0,
                 "graphicalConnection": 0,  // 0=Gaped, 1=Looped, 2=NeumeStart
                 "oct": 3,
                 "pname": 2        // NoteName enum value
+                // "symbolClass": "<SymbolClass.id>"  // set for a runtime-registered class
               }
             ],
             "sentence": { "syllables": [] }
