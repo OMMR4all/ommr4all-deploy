@@ -107,7 +107,8 @@ Three environments map to three deployment paths:
 ./start.sh                # --gpu for GPU passthrough, --no-cache for full rebuild, --stop to stop
 
 # Configuration lives in .env: PORT, STORAGE, DB_DIR, DB_NAME, DJANGO_SUPERUSER_*, LLM keys,
-# OMMR4ALL_TRUST_PROXY_HEADERS / OMMR4ALL_CSRF_TRUSTED_ORIGINS (see below)
+# OMMR4ALL_TRUST_PROXY_HEADERS / OMMR4ALL_CSRF_TRUSTED_ORIGINS (see below),
+# OMMR4ALL_DATASET_MEMORY_BUDGET_MB / OMMR4ALL_DATASET_CACHE_DIR (see Key Architecture Notes)
 
 # Create superuser manually (automatic on first start when DJANGO_SUPERUSER_* is set in .env)
 docker compose exec web /opt/ommr4all/ommr4all-deploy-venv/bin/python \
@@ -134,6 +135,11 @@ Storage and database locations are resolved from two env vars read by `settings.
 | `--gpu-legacy` | `pascal` | `2.7.1+cu126`, last release with Pascal (sm_61) kernels |
 
 The workspace floor is `torch>=2.7.1` precisely so the Pascal pin can resolve; the `cuda` extra carries its own `>=2.11` floor so it doesn't collapse onto the Pascal version. The cu121 index is **not** usable — upstream stopped publishing it at torch 2.5.1.
+- **Training dataset memory** (`omr/dataset/spill.py`, `omr/dataset/sample_store.py`): datasets are built from the ground truth on every run, so a big one is bounded by the RAM. `AlgorithmTrainer.dataset_spill()` hands all datasets of a run one `DatasetSpill` — a byte budget plus a lazily created scratch directory, closed in `train()`'s `finally`. The sample stores keep their samples in memory while they fit the budget (default: 40 % of the RAM free at the start, at least 512 MB, `OMMR4ALL_DATASET_MEMORY_BUDGET_MB`; `0` always spills) and write them into the directory (`OMMR4ALL_DATASET_CACHE_DIR`, default `TMPDIR`) once they don't — including the ones already collected. A re-check of the free RAM every 50 samples spills early when another training is competing for memory.
+  - *Segmentation* (symbols `symbols_pc_torch`, staff lines): `to_memory_dataset()` returns `(df, spilled)`; `spilled` selects the segmentation library's `MaskDataset` (same DataFrame columns read from PNG paths) over `MemoryDataset`, and the data loaders then get `loader_workers(processes)`. Masks are label maps and go through PNG losslessly; a dtype PNG cannot hold raises rather than silently rounding.
+  - *end2end*: `Sample.image_blob` is a `Blob` holding the JPEG crop either in memory or as a file, so `__getitem__` does not care which.
+  - *OCR/seq2seq* (guppy, nautilus): those trainers write every sample into a temp directory for their library anyway, so they stream instead — `iter_text_line_nautilus_samples()` / `iter_guppy_symbol_line_samples()` into `write_line_samples()`, one line image in memory at a time. No budget involved.
+  - `Dataset.load()` still caches (predictors index it repeatedly and read `operation.page_image`); training paths use `Dataset.iter_samples()` and pass `keep_original=False`, which drops the `original` column that otherwise pins every page image. On 60 pages of Pa_14819_gt (540 samples) that is +414 MB before, +133 MB now in memory, +31 MB spilled.
 - **Submodule hashes** are validated during test runs by `tests/manage_gitlab-ci.py` — if submodules are updated, that file must be updated accordingly.
 - **Multi-locale build**: The Angular client ships two variants (English default + German `production-de`); `ng build --configuration production` for English, `ng build --configuration production-de` for German.
 - **End-to-end transcription** (`omr/steps/end2end/`, group `end2end`): one network reads a music block plus its lyric line and emits symbols, syllables and syllable→note assignments as one token sequence. Two architectures share trainer, predictor and codec: `end2end_swin` (Swin-Tiny, 224 px input, training op `train_end2end`) and `end2end_convnext` (ConvNeXt-Tiny truncated at stride 16 with 2D positional encoding, 320 px input via `convnext.meta.INPUT_HEIGHT` — models keep the height they were trained with — op `train_end2end_convnext`). On Pa_14819_gt with full training data ConvNeXt reaches ~94 % hSAR vs 68 % for Swin. The localisation loss weight is `trainer.LOC_LOSS_WEIGHT = 0.2`.

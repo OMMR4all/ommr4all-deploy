@@ -50,6 +50,10 @@ services:
       FIX_STORAGE_PERMISSIONS: ${FIX_STORAGE_PERMISSIONS:-1}
       # which GPUs the task scheduler may use; empty = detect (see .env.example)
       OMMR4ALL_GPUS: ${OMMR4ALL_GPUS:-}
+      # how much of a training dataset to keep in memory before writing it to disk,
+      # and where to write it; both empty = 40 % of the free RAM into the temp dir
+      OMMR4ALL_DATASET_MEMORY_BUDGET_MB: ${OMMR4ALL_DATASET_MEMORY_BUDGET_MB:-}
+      OMMR4ALL_DATASET_CACHE_DIR: ${OMMR4ALL_DATASET_CACHE_DIR:-}
       OMMR4ALL_LLM_MAX_PIXELS: ${OMMR4ALL_LLM_MAX_PIXELS:-}
       # optional LLM providers for the text_llm transcription step;
       # leave empty to offer only the local Chandra model in the client

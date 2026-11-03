@@ -30,6 +30,13 @@ re-run `./start.sh` to apply. The most relevant ones:
 | `DB_NAME` | `db.sqlite3` | Filename of the database in that directory |
 | `DJANGO_SUPERUSER_USERNAME` / `_EMAIL` / `_PASSWORD` | *(empty)* | Auto-create the first admin user on first start |
 | `GEMINI_API_KEY`, `OPENAI_API_KEY`, … | *(empty)* | Optional LLM providers for the `text_llm` step |
+| `OMMR4ALL_DATASET_MEMORY_BUDGET_MB` | *(40 % of the free RAM)* | How much of a training dataset to keep in memory before writing it to disk |
+| `OMMR4ALL_DATASET_CACHE_DIR` | *(container temp dir)* | Where those samples are written; mount a volume here for datasets larger than the writable layer |
+
+Training datasets are built from the ground truth on every run and kept in
+memory; once they exceed the budget they are written to disk and read back batch
+by batch, so a dataset larger than the RAM no longer ends the run with a
+`MemoryError`. The scratch directory is removed when the training ends.
 
 Both directories are bind-mounted into the container, so data and database
 survive rebuilds. By default the database is `<STORAGE>/db.sqlite3`, i.e. data
@@ -136,6 +143,26 @@ owned by that user again. Re-running the deploy fixes them, or do it directly:
 ```shell
 sudo chown -R www-data: /opt/ommr4all/storage
 ```
+
+### Large training datasets
+
+Training datasets are built from the ground truth on every run and kept in
+memory. When they exceed a budget — by default 40 % of the RAM free when the run
+starts — they are written to a scratch directory instead and read back batch by
+batch, which is removed again when the training ends. Both the budget and the
+directory can be set via the environment:
+
+```shell
+echo 'export OMMR4ALL_DATASET_MEMORY_BUDGET_MB=8000' | sudo tee -a /etc/apache2/envvars
+echo 'export OMMR4ALL_DATASET_CACHE_DIR=/var/tmp/ommr4all-datasets' | sudo tee -a /etc/apache2/envvars
+sudo systemctl restart apache2
+```
+
+As with `REDIS_URL`, `settings.py` and the trainers read `os.environ` at import
+time, so this has to be the *process* environment (`/etc/apache2/envvars` plus a
+**restart**, not `SetEnv`). Point `OMMR4ALL_DATASET_CACHE_DIR` at a filesystem
+with room for the whole dataset; the scratch files are roughly the size the
+dataset would have had in memory (less for masks, which compress well).
 
 ### Behind a TLS reverse proxy (CSRF)
 
