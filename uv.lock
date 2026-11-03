@@ -21,6 +21,7 @@ members = [
     "ommr4all-line-detection",
     "ommr4all-server",
 ]
+overrides = [{ name = "libpagexml3", git = "https://github.com/uniwue-ai-ks/libpagexml3.git?rev=97e528fa89a4b68da0129cef0b362432a9d8d21b" }]
 
 [[package]]
 name = "absl-py"
@@ -1363,7 +1364,7 @@ wheels = [
 [[package]]
 name = "libpagexml3"
 version = "0.0.5"
-source = { git = "https://github.com/uniwue-ai-ks/libpagexml3.git#a2f30c152367a4e7a802881d901b0156d02e4fc3" }
+source = { git = "https://github.com/uniwue-ai-ks/libpagexml3.git?rev=97e528fa89a4b68da0129cef0b362432a9d8d21b#97e528fa89a4b68da0129cef0b362432a9d8d21b" }
 dependencies = [
     { name = "loguru" },
     { name = "numpy" },

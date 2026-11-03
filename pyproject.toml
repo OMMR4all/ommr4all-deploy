@@ -25,6 +25,12 @@ pascal = ["torch==2.7.1", "torchvision==0.22.1"]
 [tool.uv]
 # mutually exclusive, so uv locks a separate resolution for each
 conflicts = [[{ extra = "cuda" }, { extra = "pascal" }]]
+# guppyocr requires libpagexml3 straight from git, and tool.uv.sources only
+# applies to direct dependencies — so an override is the only way to pin it.
+# Keeps it on the commit that is deployed today instead of following master.
+override-dependencies = [
+    "libpagexml3 @ git+https://github.com/uniwue-ai-ks/libpagexml3.git@97e528fa89a4b68da0129cef0b362432a9d8d21b",
+]
 
 [tool.uv.workspace]
 members = ["modules/*"]
