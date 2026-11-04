@@ -30,9 +30,15 @@ cd modules/ommr4all-server
 
 # Install dependencies
 uv sync                          # from repo root — installs all workspace packages
-# `modules/ommr4all-server/requirements.txt` is legacy and no longer used by the
-# deploy/test scripts (they run `uv sync --locked`); pyproject.toml + uv.lock are
-# the source of truth. Re-run `uv lock` and commit it after changing any pyproject.
+# The root `pyproject.toml` + `uv.lock` are the only source of truth. The legacy
+# `modules/ommr4all-server/requirements.txt` and the per-submodule `uv.lock` were
+# removed: nothing installed from them (deploy/test run `uv sync --locked` with cwd
+# = repo root), but Dependabot scanned them and reported each advisory three times.
+# Re-run `uv lock` and commit it after changing any pyproject.
+#
+# Dependency floors, not `==` pins: an exact pin is invisible to `uv lock --upgrade`,
+# which is how django sat on 5.2.0 through 35 advisories. Django stays on the 5.2 LTS
+# series (`>=5.2.19,<6`); opencv is held below 5 until the cv2 major gets its own pass.
 
 # Apply migrations
 python manage.py migrate
@@ -136,6 +142,7 @@ Storage and database locations are resolved from two env vars read by `settings.
 
 The workspace floor is `torch>=2.7.1` precisely so the Pascal pin can resolve; the `cuda` extra carries its own `>=2.11` floor so it doesn't collapse onto the Pascal version. The cu121 index is **not** usable — upstream stopped publishing it at torch 2.5.1.
 - **Third-party git dependencies are pinned by commit.** `pixel-classifier-torch` (`OMMR4all/segmentation-pytorch`) and `guppyocr` (`uniwue-ai-ks/guppyocr`) carry an explicit `rev = "<full sha>"` in `modules/ommr4all-server/pyproject.toml`; `libpagexml3`, which guppyocr requires straight from git, is pinned through `override-dependencies` in the root `[tool.uv]` because `tool.uv.sources` only applies to direct dependencies. All three live in public GitHub repos, so no credentials are needed. To bump one, edit its `rev` (or the override string) and run `uv lock`; `uv lock --upgrade` will not move a pinned rev.
+- **Page index** (`database/book_index.py`, `database/models/book_index.py`): the book folder stays the source of truth, the `BookIndex`/`PageIndex` rows are derived data keyed by file mtimes, written best-effort and stat-validated on read, so a stale or missing row self-heals on access (`manage.py reindex_books` rebuilds everything). A `PageIndex` row carries the page progress (locks, verified), the lazily computed statistics counts, the page comments, and `content`: the structural counts of `pcgts.json` (`database/page_content.py`). **The batch predicates of a step (`unprocessed`, `runnable`) must answer from `DatabasePage.page_content()`, never from `page.pcgts()`** -- the page selection endpoint runs them over every page of the book on every render of the workflow tab, and a full parse costs ~90 ms per page, i.e. 47 s and several GiB for the 532 pages of Moosburger_Graduale, long enough for the server to kill the request. `PageContent.from_page` defines what a count means, `from_pcgts_json` is the raw-json version the index stores, and `tests/test_page_content.py` holds the two to each other; a new fact means a new field there plus a bump of its `VERSION` (rows of an older version are recomputed on read). `prefill_pages(book)` hands out all pages of a book with progress and counts preloaded, which costs one query plus two stats per page.
 - **Training dataset memory** (`omr/dataset/spill.py`, `omr/dataset/sample_store.py`): datasets are built from the ground truth on every run, so a big one is bounded by the RAM. `AlgorithmTrainer.dataset_spill()` hands all datasets of a run one `DatasetSpill` — a byte budget plus a lazily created scratch directory, closed in `train()`'s `finally`. The sample stores keep their samples in memory while they fit the budget (default: 40 % of the RAM free at the start, at least 512 MB, `OMMR4ALL_DATASET_MEMORY_BUDGET_MB`; `0` always spills) and write them into the directory (`OMMR4ALL_DATASET_CACHE_DIR`, default `TMPDIR`) once they don't — including the ones already collected. A re-check of the free RAM every 50 samples spills early when another training is competing for memory.
   - *Segmentation* (symbols `symbols_pc_torch`, staff lines): `to_memory_dataset()` returns `(df, spilled)`; `spilled` selects the segmentation library's `MaskDataset` (same DataFrame columns read from PNG paths) over `MemoryDataset`, and the data loaders then get `loader_workers(processes)`. Masks are label maps and go through PNG losslessly; a dtype PNG cannot hold raises rather than silently rounding.
   - *end2end*: `Sample.image_blob` is a `Blob` holding the JPEG crop either in memory or as a file, so `__getitem__` does not care which.
