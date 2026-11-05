@@ -25,6 +25,10 @@ pascal = ["torch==2.7.1", "torchvision==0.22.1"]
 [tool.uv]
 # mutually exclusive, so uv locks a separate resolution for each
 conflicts = [[{ extra = "cuda" }, { extra = "pascal" }]]
+# setuptools reaches us only through torch, triton, tensorboard and
+# pixel-classifier-torch, so no floor of ours can move it — 84.1.0 is the first
+# release past GHSA-h35f-9h28-mq5c and GHSA-xmj3-9gf7-h52w.
+constraint-dependencies = ["setuptools>=84.1.0"]
 # guppyocr requires libpagexml3 straight from git, and tool.uv.sources only
 # applies to direct dependencies — so an override is the only way to pin it.
 # Keeps it on the commit that is deployed today instead of following master.
