@@ -17,6 +17,38 @@ That is the whole setup. On the first run `start.sh` creates `.env` from
 `.env.example`, creates the storage/database directories, builds the image and
 starts the services. The app is then served at `http://localhost:8001`.
 
+### GPU
+
+`--gpu` passes the cards into the container (requires the NVIDIA driver and
+`nvidia-container-toolkit` on the host; check with
+`docker run --rm --gpus all ubuntu:24.04 nvidia-smi`). It does **not** change the
+torch build: the image already ships a CUDA-enabled torch, but a CUDA 13 one,
+which needs a driver from the 580 series or newer. For older drivers and older
+cards the build has to be selected explicitly:
+
+| Host | Flag | torch baked into the image |
+|---|---|---|
+| CUDA 13 driver (580+) | `--gpu` | default PyPI wheel (CUDA 13) |
+| CUDA 12.x driver | `--gpu-cuda` | `2.14.1+cu126` |
+| Pascal cards (GTX 10xx, P100, sm_61) | `--gpu-legacy` | `2.7.1+cu126`, the last release with sm_61 kernels |
+
+The flag is a *build* option (`GPU_MODE`), so add `--no-cache` when switching an
+already built image. Verify with the line `start.sh` prints at the end:
+
+```shell
+docker compose exec web /opt/ommr4all/ommr4all-deploy-venv/bin/python -c \
+ "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.get_arch_list())"
+```
+
+`is_available()` as `False` while `nvidia-smi` works on the host means the driver
+is older than the baked-in CUDA. A card whose compute capability is missing from
+`get_arch_list()` needs a different flag even when `is_available()` is `True`.
+
+One GPU worker slot is registered per detected card, each pinned to its device
+via `CUDA_VISIBLE_DEVICES`, so a two-card host runs two GPU tasks at once. Set
+`OMMR4ALL_GPUS` in `.env` to restrict this (`0,1` for specific devices, `none`
+for CPU only); leave it empty to detect.
+
 ### Configuration
 
 All settings live in the `.env` file next to `docker-compose.yml`. Edit it and

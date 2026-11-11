@@ -4,6 +4,10 @@
 *Thumbs.db*
 mockup
 .env
+# alternative env files, e.g. .env.test for a throwaway smoke-test instance
+# (compose: --env-file .env.test); .env.example stays tracked
+.env.*
+!.env.example
 .claude/
 __pycache__/
 *.pyc

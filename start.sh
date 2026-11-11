@@ -7,7 +7,11 @@
 #
 # Options:
 #   --gpu         Pass the NVIDIA GPU into the container (needs nvidia-container-toolkit).
-#                 Can be combined with --no-cache:  ./start.sh --gpu --no-cache
+#                 Keeps the image's default torch, which is CUDA 13 and therefore needs
+#                 a 580+ driver. Can be combined with --no-cache: ./start.sh --gpu --no-cache
+#   --gpu-cuda    Like --gpu, but builds the image with the cu126 torch, for hosts whose
+#                 driver predates CUDA 13 (nvidia-smi reports CUDA 12.x). Pair with
+#                 --no-cache to rebuild an image that was already built differently.
 #   --gpu-legacy  Like --gpu, but builds the image with a Pascal-compatible torch
 #                 (sm_61, e.g. GTX 10xx). Recent torch dropped Pascal support; this
 #                 bakes torch 2.7.1+cu126 into the image. Pair with --no-cache to rebuild.
@@ -41,6 +45,12 @@ for arg in "$@"; do
             ;;
         --gpu)
             GPU=1
+            ;;
+        --gpu-cuda)
+            GPU=1
+            # Bake the cu126 torch into the image (see Dockerfile ARG GPU_MODE)
+            GPU_MODE=cuda
+            export GPU_MODE
             ;;
         --gpu-legacy)
             GPU=1
@@ -119,10 +129,14 @@ echo "OMMR4all is starting at http://localhost:${PORT}"
 if [[ "$GPU" == 1 ]]; then
     if [[ "$GPU_MODE" == legacy ]]; then
         echo "GPU passthrough enabled (Pascal-compatible torch 2.7.1+cu126 baked in). Verify with:"
+    elif [[ "$GPU_MODE" == cuda ]]; then
+        echo "GPU passthrough enabled (cu126 torch baked in). Verify with:"
     else
         echo "GPU passthrough enabled. Verify with:"
     fi
-    echo "  docker compose exec web /opt/ommr4all/ommr4all-deploy-venv/bin/python -c 'import torch; print(torch.cuda.is_available())'"
+    # get_arch_list() too: a card whose compute capability is missing from it needs
+    # another GPU_MODE even when is_available() is True
+    echo "  docker compose exec web /opt/ommr4all/ommr4all-deploy-venv/bin/python -c 'import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.get_arch_list())'"
 fi
 echo "Logs: docker compose logs -f"
 echo "Stop: ./start.sh --stop"

@@ -56,11 +56,15 @@ ENV OMMR4ALL_STORAGE_ROOT=/opt/ommr4all/storage
 
 # Run deploy script.
 # --dbdir only sets the *baked-in default* db path; a runtime OMMR4ALL_DB_PATH wins.
-# GPU_MODE=legacy bakes a Pascal-compatible torch (sm_61, e.g. GTX 10xx) into the
-# image; otherwise the default CPU/PyPI torch is installed (start.sh sets this).
+# Which torch build to bake in (start.sh sets this; see the table in the README):
+#   unset   default PyPI torch, already CUDA-enabled, but a CUDA 13 runtime -> needs
+#           a 580+ driver, which is why the other two modes exist
+#   cuda    newest cu126 build, for hosts whose driver predates CUDA 13
+#   legacy  Pascal-compatible torch (sm_61, e.g. GTX 10xx)
 ARG GPU_MODE=
 RUN cd /opt/ommr4all/ommr4all-deploy-src \
-    && if [ "$GPU_MODE" = "legacy" ]; then EXTRA=--gpu-legacy; fi \
+    && if [ "$GPU_MODE" = "legacy" ]; then EXTRA=--gpu-legacy; \
+       elif [ "$GPU_MODE" = "cuda" ]; then EXTRA=--gpu; fi \
     && python3 ommr4all-deploy/deploy.py --dbdir /opt/ommr4all/storage $EXTRA
 
 # Entrypoint backs up + migrates the DB and creates the superuser (from

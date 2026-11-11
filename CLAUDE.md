@@ -111,6 +111,7 @@ Three environments map to three deployment paths:
 ```bash
 # Build and start (creates .env from .env.example on first run)
 ./start.sh                # --gpu for GPU passthrough, --no-cache for full rebuild, --stop to stop
+                          # --gpu-cuda / --gpu-legacy pick another torch build (see the table below)
 
 # Configuration lives in .env: PORT, STORAGE, DB_DIR, DB_NAME, DJANGO_SUPERUSER_*, LLM keys,
 # OMMR4ALL_TRUST_PROXY_HEADERS / OMMR4ALL_CSRF_TRUSTED_ORIGINS (see below),
@@ -134,11 +135,13 @@ Storage and database locations are resolved from two env vars read by `settings.
 - **WebSocket support** is provided by Django Channels; routing is in `modules/ommr4all-server/ommr4all/routing.py`. In the Docker setup a separate `ws` service runs daphne (ASGI) with a Redis channel layer and Apache proxies `/ws` to it via `mod_proxy_wstunnel`; the dev server uses the in-memory channel layer.
 - **Package manager**: The workspace uses `uv` (see `pyproject.toml` and `uv.lock`). The deploy scripts create uv-based virtualenvs targeting Python 3.12 (`deploy.py` at `/opt/ommr4all/ommr4all-deploy-venv`) and populate them with `uv sync --locked` via `UV_PROJECT_ENVIRONMENT`, which also installs the three workspace members as editable. `--locked` fails on a stale lock, so run `uv lock` and commit after touching any `pyproject.toml`. The torch build is selected by a uv extra, and all three variants are locked in `uv.lock`:
 
-| Deploy flag | uv extra | torch |
-|---|---|---|
-| *(none)* | — | PyPI wheel, already CUDA-enabled (`2.11.0+cu130`) — what Docker uses |
-| `--gpu` | `cuda` | newest cu126 build (`2.13.0+cu126`), for drivers predating CUDA 13 |
-| `--gpu-legacy` | `pascal` | `2.7.1+cu126`, last release with Pascal (sm_61) kernels |
+| `deploy.py` flag | `start.sh` flag | uv extra | torch |
+|---|---|---|---|
+| *(none)* | *(none)* or `--gpu` | — | PyPI wheel, already CUDA-enabled (`2.15.0`, pulling `nvidia-cudnn-cu13`), so it needs a CUDA 13 driver (580+). The Docker default. |
+| `--gpu` | `--gpu-cuda` | `cuda` | newest cu126 build (`2.14.1+cu126`), for drivers predating CUDA 13 |
+| `--gpu-legacy` | `--gpu-legacy` | `pascal` | `2.7.1+cu126`, last release with Pascal (sm_61) kernels |
+
+The two flag columns differ because `start.sh --gpu` only adds the device reservation (`docker-compose.gpu.yml`) and leaves the image's default torch in place; the build is selected by the `GPU_MODE` build arg, which the Dockerfile maps to the `deploy.py` flag. `torch.cuda.is_available()` returning `False` on a host whose `nvidia-smi` works is the signature of a driver older than the baked-in CUDA; `torch.cuda.get_arch_list()` missing the card's compute capability is the signature of a card too old for it (both are printed by the verification line `start.sh` prints after a `--gpu*` start).
 
 The workspace floor is `torch>=2.7.1` precisely so the Pascal pin can resolve; the `cuda` extra carries its own `>=2.11` floor so it doesn't collapse onto the Pascal version. The cu121 index is **not** usable — upstream stopped publishing it at torch 2.5.1.
 - **Third-party git dependencies are pinned by commit.** `pixel-classifier-torch` (`OMMR4all/segmentation-pytorch`) and `guppyocr` (`uniwue-ai-ks/guppyocr`) carry an explicit `rev = "<full sha>"` in `modules/ommr4all-server/pyproject.toml`; `libpagexml3`, which guppyocr requires straight from git, is pinned through `override-dependencies` in the root `[tool.uv]` because `tool.uv.sources` only applies to direct dependencies. All three live in public GitHub repos, so no credentials are needed. To bump one, edit its `rev` (or the override string) and run `uv lock`; `uv lock --upgrade` will not move a pinned rev.
