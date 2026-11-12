@@ -20,6 +20,9 @@ modules/ommr4all-client/dist
 test-server-venv
 **/.venv
 mockup
+# training/experiment output — host-local results, several GB, never read at runtime
+runs
+.idea
 torchtest.py
 Claude.Containerfile
 opencode.Containerfile

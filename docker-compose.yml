@@ -27,7 +27,7 @@ x-ommr4all-volumes: &ommr4all-volumes
 
 services:
   web:
-    image: uniwue/ommr4all
+    image: ${OMMR4ALL_IMAGE:-uniwue/ommr4all}
     build:
       context: .
       # GPU_MODE=legacy (set by `start.sh --gpu-legacy`) bakes a Pascal-compatible
@@ -91,7 +91,7 @@ services:
   # daphne serves the ASGI/websocket side (/ws is proxied here by Apache);
   # mod_wsgi in the web service is WSGI-only and cannot speak websockets
   ws:
-    image: uniwue/ommr4all
+    image: ${OMMR4ALL_IMAGE:-uniwue/ommr4all}
     build:
       context: .
       args:
@@ -114,7 +114,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
   test:
-    image: uniwue/ommr4all
+    image: ${OMMR4ALL_IMAGE:-uniwue/ommr4all}
     build: .
     profiles:
       - test
