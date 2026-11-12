@@ -11,8 +11,9 @@
 x-ommr4all-env: &ommr4all-env
   OMMR4ALL_STORAGE_ROOT: /opt/ommr4all/storage
   OMMR4ALL_DB_PATH: /opt/ommr4all/db/${DB_NAME:-db.sqlite3}
-  # channel layer shared between the services so HTTP-triggered events reach websockets
-  REDIS_URL: redis://redis:6379/0
+  # channel layer shared between the services so HTTP-triggered events reach websockets.
+  # Overridable from .env only to point at an external Redis; both services must agree.
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
   # reverse proxy / CSRF (see .env.example): needed so that form posts — above all the
   # /admin/ login — are accepted when a TLS terminating proxy sits in front of the app
   OMMR4ALL_TRUST_PROXY_HEADERS: ${OMMR4ALL_TRUST_PROXY_HEADERS:-1}
@@ -50,6 +51,17 @@ services:
       FIX_STORAGE_PERMISSIONS: ${FIX_STORAGE_PERMISSIONS:-1}
       # which GPUs the task scheduler may use; empty = detect (see .env.example)
       OMMR4ALL_GPUS: ${OMMR4ALL_GPUS:-}
+      # task scheduler tuning; all empty = the defaults in settings.py. Only the web
+      # service runs the scheduler (it lives in the wsgi process), so ws does not need them.
+      TASK_WORKER_IDLE_TIMEOUT: ${TASK_WORKER_IDLE_TIMEOUT:-600}
+      TASK_WORKER_TERMINATE_TIMEOUT: ${TASK_WORKER_TERMINATE_TIMEOUT:-5}
+      TASK_SCHEDULER_STALL_TIMEOUT: ${TASK_SCHEDULER_STALL_TIMEOUT:-60}
+      TASK_MAX_RUNTIME: ${TASK_MAX_RUNTIME:-0}
+      TASK_OPERATION_WATCHER_INTERVAL: ${TASK_OPERATION_WATCHER_INTERVAL:-30}
+      # warn when saving one page takes longer than this (diagnoses slow storage)
+      OMMR4ALL_SLOW_SAVE_SECONDS: ${OMMR4ALL_SLOW_SAVE_SECONDS:-}
+      # output directory of the discovery CLI (container-side path)
+      OMMR4ALL_DISCOVERY_OUT: ${OMMR4ALL_DISCOVERY_OUT:-}
       # how much of a training dataset to keep in memory before writing it to disk,
       # and where to write it; both empty = 40 % of the free RAM into the temp dir
       OMMR4ALL_DATASET_MEMORY_BUDGET_MB: ${OMMR4ALL_DATASET_MEMORY_BUDGET_MB:-}
@@ -58,10 +70,16 @@ services:
       # optional LLM providers for the text_llm transcription step;
       # leave empty to offer only the local Chandra model in the client
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # accepted as an alias for GEMINI_API_KEY by the adapter and the batch tool
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_API_URL: ${OPENAI_API_URL:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
+      # directories holding API key files instead of the keys above; container-side
+      # paths, so the directory must be mounted in (see .env.example)
+      GEMINI_API_KEY_DIR: ${GEMINI_API_KEY_DIR:-}
+      OMMR4ALL_API_KEY_DIR: ${OMMR4ALL_API_KEY_DIR:-}
     depends_on:
       - redis
     healthcheck:
